@@ -173,15 +173,18 @@ def generate_lqr_gains(
     # Step 2: ZOH 离散化
     Ad, Bd = c2d(A, B, dt_control)
 
-    # Step 3: 求解三种模式的 LQR 增益
+    # Step 3: 求解四种模式的 LQR 增益
     # Mode 1: Full - 均衡策略
-    K_full = solve_lqr(Ad, Bd, [0.5, 30.0, 100.0], 2.0)
+    K_full = solve_lqr(Ad, Bd, [2.0, 30.0, 10.0], 2.0)
 
     # Mode 2: Shortest - 优先速度收敛（最短刹车距离）
-    K_shortest = solve_lqr(Ad, Bd, [8.0, 2.0, 10.0], 3.0)
+    K_shortest = solve_lqr(Ad, Bd, [8.0, 2.0, 1.0], 3.0)
 
     # Mode 3: MinSwing - 优先摆动抑制（温柔刹车）
-    K_minswing = solve_lqr(Ad, Bd, [0.3, 30.0, 600.0], 2.0)
+    K_minswing = solve_lqr(Ad, Bd, [1.0, 100.0, 50.0], 2.0)
+
+    # Mode 4: VelocityOmega - 同时抑制速度和角速度
+    K_velomega = solve_lqr(Ad, Bd, [10.0, 1.0, 100.0], 2.0)
 
     # Step 4: 打印闭环极点，验证稳定性
     print("=" * 60)
@@ -189,7 +192,7 @@ def generate_lqr_gains(
     print(f"绳长 L = {rope_length:.3f} m, 控制周期 Ts = {dt_control:.3f} s")
     print("=" * 60)
 
-    for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing)]:
+    for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing), ("VelocityOmega", K_velomega)]:
         # 闭环矩阵 A_cl = Ad - Bd * K
         Acl = Ad - Bd @ K.reshape(1, -1)
         eigs = np.linalg.eigvals(Acl)
@@ -224,9 +227,10 @@ def generate_lqr_gains(
 namespace pendulum {{
 
 enum class LqrMode {{
-    kFull,        ///< 均衡模式：速度收敛 + 摆动抑制
-    kShortest,    ///< 最短距离模式：优先速度收敛
-    kMinSwing     ///< 最小摆动模式：优先摆动抑制
+    kFull,          ///< 均衡模式：速度收敛 + 摆动抑制
+    kShortest,      ///< 最短距离模式：优先速度收敛
+    kMinSwing,      ///< 最小摆动模式：优先摆动抑制
+    kVelocityOmega  ///< 速度+角速度模式：同时抑制速度和平抑角速度
 }};
 
 struct LqrGain {{
@@ -244,6 +248,11 @@ struct LqrGain {{
     static constexpr double kMinSwingV     = {K_minswing[0]:.8f};
     static constexpr double kMinSwingTheta = {K_minswing[1]:.8f};
     static constexpr double kMinSwingOmega = {K_minswing[2]:.8f};
+
+    // VelocityOmega: Q=[10,1,100], R=2
+    static constexpr double kVelocityOmegaV     = {K_velomega[0]:.8f};
+    static constexpr double kVelocityOmegaTheta = {K_velomega[1]:.8f};
+    static constexpr double kVelocityOmegaOmega = {K_velomega[2]:.8f};
 }};
 
 }} // namespace pendulum

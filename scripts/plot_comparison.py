@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare three control modes: Full, PositionOnly, SwingOnly."""
+"""Compare four control modes: Full, Shortest, MinSwing, VelocityOmega."""
 
 import sys
 import pandas as pd
@@ -18,7 +18,6 @@ def detect_brake_start(df, ax_threshold=-0.1):
     if len(braking) == 0:
         return None, None
     t_brake = braking["time_s"].iloc[0]
-    # Find corresponding position (closest time)
     idx = (df["time_s"] - t_brake).abs().idxmin()
     px_brake = df.loc[idx, "px_truth_m"]
     return t_brake, px_brake
@@ -30,7 +29,7 @@ def plot_comparison(files, labels, output_path="comparison.png"):
         sys.exit(1)
 
     data = [load_and_label(f, l) for f, l in zip(files, labels)]
-    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red"}
+    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red", "VelocityOmega": "purple"}
 
     # Auto-detect brake start from first dataset (all should be same)
     t_brake, px_brake = detect_brake_start(data[0])
@@ -38,7 +37,7 @@ def plot_comparison(files, labels, output_path="comparison.png"):
         t_brake = 15.0
         px_brake = 0.0
 
-    fig, axes = plt.subplots(4, 1, figsize=(12, 14), sharex=True)
+    fig, axes = plt.subplots(5, 1, figsize=(12, 16), sharex=True)
     fig.suptitle("Control Mode Comparison (1D Pitch)", fontsize=14, fontweight="bold")
 
     # 1. Position
@@ -68,8 +67,23 @@ def plot_comparison(files, labels, output_path="comparison.png"):
     ax.grid(True, alpha=0.3)
     ax.set_title("Horizontal Velocity")
 
-    # 3. Pendulum angle
+    # 3. Swing Velocity (L * omega)
     ax = axes[2]
+    for df in data:
+        c = colors.get(df["mode"].iloc[0], "black")
+        # Compute swing tangential velocity: v_swing = L * omega
+        rope_len = 15.0  # default rope length; could be parameterized
+        v_swing = df["theta_dot_truth_rad_s"] * rope_len
+        ax.plot(df["time_s"], v_swing, color=c, label=df["mode"].iloc[0], linewidth=1.5)
+    ax.axhline(0, color="black", linestyle="-", alpha=0.2)
+    ax.axvline(t_brake, color="black", linestyle="--", alpha=0.4)
+    ax.set_ylabel("Swing Velocity [m/s]")
+    ax.legend(loc="upper right")
+    ax.grid(True, alpha=0.3)
+    ax.set_title("Payload Swing Velocity (L·ω)")
+
+    # 4. Pendulum angle
+    ax = axes[3]
     for df in data:
         c = colors.get(df["mode"].iloc[0], "black")
         ax.plot(df["time_s"], df["theta_truth_rad"] * 180 / 3.14159,
@@ -81,13 +95,14 @@ def plot_comparison(files, labels, output_path="comparison.png"):
     ax.grid(True, alpha=0.3)
     ax.set_title("Pendulum Pitch Angle")
 
-    # 4. Control input
-    ax = axes[3]
+    # 5. Control input
+    ax = axes[4]
     for df in data:
         c = colors.get(df["mode"].iloc[0], "black")
         ax.plot(df["time_s"], df["ax_applied_m_s2"], color=c, label=df["mode"].iloc[0], linewidth=1.5)
     ax.axhline(3, color="gray", linestyle="--", alpha=0.3)
     ax.axhline(-3, color="gray", linestyle="--", alpha=0.3)
+    ax.axhline(0, color="black", linestyle="-", alpha=0.2)
     ax.axvline(t_brake, color="black", linestyle="--", alpha=0.4)
     ax.set_ylabel("Acceleration [m/s²]")
     ax.set_xlabel("Time [s]")
@@ -98,7 +113,7 @@ def plot_comparison(files, labels, output_path="comparison.png"):
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig(output_path, dpi=150)
     print(f"Comparison plot saved to: {output_path}")
-    plt.show()  # Uncomment for interactive display
+    # plt.show()  # Uncomment for interactive display
 
     # Print summary
     print("\n" + "=" * 60)
@@ -115,10 +130,10 @@ def plot_comparison(files, labels, output_path="comparison.png"):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python3 plot_comparison.py <full.csv> <pos.csv> <swing.csv>")
+    if len(sys.argv) < 5:
+        print("Usage: python3 plot_comparison.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv>")
         sys.exit(1)
     plot_comparison(
-        [sys.argv[1], sys.argv[2], sys.argv[3]],
-        ["Full", "Shortest", "MinSwing"]
+        [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]],
+        ["Full", "Shortest", "MinSwing", "VelocityOmega"]
     )

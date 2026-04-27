@@ -7,26 +7,32 @@
 namespace pendulum {
 
 enum class LqrMode {
-    kFull,        ///< 均衡模式：速度收敛 + 摆动抑制
-    kShortest,    ///< 最短距离模式：优先速度收敛
-    kMinSwing     ///< 最小摆动模式：优先摆动抑制
+    kFull,          ///< 均衡模式：速度收敛 + 摆动抑制
+    kShortest,      ///< 最短距离模式：优先速度收敛
+    kMinSwing,      ///< 最小摆动模式：优先摆动抑制
+    kVelocityOmega  ///< 速度+角速度模式：同时抑制速度和平抑角速度
 };
 
 struct LqrGain {
     // Full: Q=[2,30,10], R=2
-    static constexpr double kFullV     = 0.49511623;
-    static constexpr double kFullTheta = -3.60133076;
-    static constexpr double kFullOmega = -7.18935072;
+    static constexpr double kFullV     = 0.98793039;
+    static constexpr double kFullTheta = -3.33079858;
+    static constexpr double kFullOmega = -3.20965162;
 
     // Shortest: Q=[8,2,1], R=3
-    static constexpr double kShortestV     = 1.60551098;
-    static constexpr double kShortestTheta = -1.46437809;
-    static constexpr double kShortestOmega = -0.96359954;
+    static constexpr double kShortestV     = 1.60599035;
+    static constexpr double kShortestTheta = -0.82512925;
+    static constexpr double kShortestOmega = -0.51700885;
 
     // MinSwing: Q=[1,100,50], R=2
-    static constexpr double kMinSwingV     = 0.38155897;
-    static constexpr double kMinSwingTheta = -5.40290467;
-    static constexpr double kMinSwingOmega = -16.39513344;
+    static constexpr double kMinSwingV     = 0.69883014;
+    static constexpr double kMinSwingTheta = -5.69992072;
+    static constexpr double kMinSwingOmega = -7.02950842;
+
+    // VelocityOmega: Q=[10,1,100], R=2
+    static constexpr double kVelocityOmegaV     = 2.18231813;
+    static constexpr double kVelocityOmegaTheta = -5.09629988;
+    static constexpr double kVelocityOmegaOmega = -2.93945274;
 };
 
 } // namespace pendulum

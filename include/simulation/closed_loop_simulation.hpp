@@ -12,9 +12,10 @@
 namespace pendulum {
 
 enum class ControlMode {
-    kFull,       ///< 最短刹车距离 + 最小摆角
-    kShortest,   ///< 最短刹车距离
-    kMinSwing    ///< 最小摆角
+    kFull,          ///< 均衡模式
+    kShortest,      ///< 最短刹车距离
+    kMinSwing,      ///< 最小摆角
+    kVelocityOmega  ///< 速度+角速度联合抑制
 };
 struct ClosedLoopConfig {
     double dtTruth = 0.001;          ///< Ground-truth dynamics step [s]

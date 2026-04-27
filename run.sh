@@ -36,6 +36,7 @@ make -j$(nproc)
 ./run_closed_loop_lqr 0
 ./run_closed_loop_lqr 1
 ./run_closed_loop_lqr 2
+./run_closed_loop_lqr 3
 
 echo ""
 echo "========================================"
@@ -44,12 +45,12 @@ echo "========================================"
 
 if [[ "$PLOT_MODE" == "1" || "$PLOT_MODE" == "2" ]]; then
     echo "--> Generating comparison.png ..."
-    python3 ../scripts/plot_comparison.py closed_loop_full.csv closed_loop_shortest.csv closed_loop_minswing.csv
+    python3 ../scripts/plot_comparison.py closed_loop_full.csv closed_loop_shortest.csv closed_loop_minswing.csv closed_loop_velomega.csv
 fi
 
 if [[ "$PLOT_MODE" == "1" || "$PLOT_MODE" == "3" ]]; then
     echo "--> Generating brake_phase.png ..."
-    python3 ../scripts/plot_brake_phase.py closed_loop_full.csv closed_loop_shortest.csv closed_loop_minswing.csv
+    python3 ../scripts/plot_brake_phase.py closed_loop_full.csv closed_loop_shortest.csv closed_loop_minswing.csv closed_loop_velomega.csv
 fi
 
 cd ..

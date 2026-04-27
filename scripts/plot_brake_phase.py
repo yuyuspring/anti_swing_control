@@ -34,7 +34,7 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
         sys.exit(1)
 
     data = [load_and_label(f, l) for f, l in zip(files, labels)]
-    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red"}
+    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red", "VelocityOmega": "purple"}
 
     # 自动检测刹车开始时间（以第一个文件为准）
     t_brake, px_brake = detect_brake_start(data[0])
@@ -42,9 +42,7 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
         t_brake = 15.0
         px_brake = 0.0
 
-    # 筛选刹车段数据，并做归一化：
-    # - 时间以刹车开始时刻为 0
-    # - 位置以刹车开始位置为 0（显示相对位移）
+    # 筛选刹车段数据，并做归一化
     brake_data = []
     for df in data:
         sub = df[df["time_s"] >= t_brake].copy()
@@ -52,7 +50,7 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
         sub["px_rel"] = sub["px_truth_m"] - px_brake
         brake_data.append(sub)
 
-    fig, axes = plt.subplots(4, 1, figsize=(12, 14), sharex=True)
+    fig, axes = plt.subplots(5, 1, figsize=(12, 16), sharex=True)
     fig.suptitle("Brake Phase Comparison", fontsize=14, fontweight="bold")
 
     # 1. Position（相对位移 = 刹车距离）
@@ -76,8 +74,21 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
     ax.grid(True, alpha=0.3)
     ax.set_title("Horizontal Velocity")
 
-    # 3. Pendulum angle
+    # 3. Swing Velocity (L * omega)
     ax = axes[2]
+    rope_len = 15.0
+    for df in brake_data:
+        c = colors.get(df["mode"].iloc[0], "black")
+        v_swing = df["theta_dot_truth_rad_s"] * rope_len
+        ax.plot(df["time_rel"], v_swing, color=c, label=df["mode"].iloc[0], linewidth=1.5)
+    ax.axhline(0, color="black", linestyle="-", alpha=0.2)
+    ax.set_ylabel("Swing Velocity [m/s]")
+    ax.legend(loc="upper right")
+    ax.grid(True, alpha=0.3)
+    ax.set_title("Payload Swing Velocity (L·ω)")
+
+    # 4. Pendulum angle
+    ax = axes[3]
     for df in brake_data:
         c = colors.get(df["mode"].iloc[0], "black")
         ax.plot(df["time_rel"], df["theta_truth_rad"] * 180 / 3.14159,
@@ -88,8 +99,8 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
     ax.grid(True, alpha=0.3)
     ax.set_title("Pendulum Pitch Angle")
 
-    # 4. Control input
-    ax = axes[3]
+    # 5. Control input
+    ax = axes[4]
     for df in brake_data:
         c = colors.get(df["mode"].iloc[0], "black")
         ax.plot(df["time_rel"], df["ax_applied_m_s2"], color=c, label=df["mode"].iloc[0], linewidth=1.5)
@@ -123,10 +134,10 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python3 plot_brake_phase.py <full.csv> <shortest.csv> <minswing.csv>")
+    if len(sys.argv) < 5:
+        print("Usage: python3 plot_brake_phase.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv>")
         sys.exit(1)
     plot_brake_phase(
-        [sys.argv[1], sys.argv[2], sys.argv[3]],
-        ["Full", "Shortest", "MinSwing"]
+        [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]],
+        ["Full", "Shortest", "MinSwing", "VelocityOmega"]
     )

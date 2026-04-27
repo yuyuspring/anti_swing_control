@@ -61,7 +61,8 @@ void ClosedLoopSimulation::run() {
     std::cout << "[ClosedLoopSimulation] Starting simulation...\n"
               << "  Mode            : "
               << (mode_ == ControlMode::kFull ? "Full" :
-                  mode_ == ControlMode::kShortest ? "Shortest" : "MinSwing")
+                  mode_ == ControlMode::kShortest ? "Shortest" :
+                  mode_ == ControlMode::kMinSwing ? "MinSwing" : "VelocityOmega")
               << "\n"
               << "  Start position  : " << config_.pStart << " m\n"
               << "  Cruise speed    : " << config_.cruiseSpeed << " m/s\n"
