@@ -2,6 +2,8 @@
 
 #include "utils/type_defs.hpp"
 
+#include <cmath>
+
 namespace pendulum {
 
 /**
@@ -19,9 +21,13 @@ class SlungLoadDynamics {
 public:
     /**
      * @param ropeLengthM   Rope length [m].  Must be > 0.
-     * @param dampingRatio  Dimensionless damping ratio (zeta).
+     * @param vxMax         Maximum horizontal velocity [m/s].
      */
-    SlungLoadDynamics(double ropeLengthM, double dampingRatio);
+    SlungLoadDynamics(double ropeLengthM, double vxMax = 1e6,
+                      double payloadMass = 150.0,
+                      double dragCoeff = 1.0,
+                      double dragArea = 0.5,
+                      double linearDampingCoeff = 0.15);
 
     /**
      * @brief Advance the state by one RK4 step.
@@ -33,12 +39,17 @@ public:
     void step(SystemState& state, double axMS2, double dt);
 
     double ropeLength() const { return L_; }
-    double naturalFrequency() const { return omegaN_; }
+    double naturalFrequency() const { return std::sqrt(9.81 / L_); }
 
 private:
     double L_;       ///< Rope length [m]
-    double zeta_;    ///< Damping ratio [-]
-    double omegaN_;  ///< Natural frequency sqrt(g/L) [rad/s]
+    double vxMax_;   ///< Max horizontal velocity [m/s]
+    double payloadMass_; ///< Payload mass [kg]
+    double dragCoeff_;   ///< Drag coefficient Cd [-]
+    double dragArea_;    ///< Reference area [m^2]
+    double airDensity_;  ///< Air density [kg/m^3]
+    double dragFactor_;  ///< Pre-computed (Cd * rho * A * L) / (2 * m)
+    double linearDampingCoeff_; ///< Linear damping coefficient [1/s]
 
     /**
      * @brief Compute the state derivative f(state, u).

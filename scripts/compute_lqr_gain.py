@@ -1,139 +1,249 @@
 #!/usr/bin/env python3
 """
-Compute LQR gain for the 1-D pitch slung-load system.
+LQR 增益离线计算脚本
 
-Generates include/controller/lqr_gain.hpp with the discrete-time LQR gain.
+功能：为 1-D 俯仰吊重制动控制设计离散 LQR 控制器，
+      并自动生成 C++ 头文件 include/controller/lqr_gain.hpp。
+
+控制目标：将无人机水平速度降到 0，同时抑制吊重摆动。
+状态向量：x = [vx, theta, theta_dot]^T
+控制输入：u = ax（无人机水平加速度）
+
+使用方法：
+    python3 scripts/compute_lqr_gain.py
+    python3 scripts/compute_lqr_gain.py --rope-length 10.0 --dt 0.01
 """
 
 import numpy as np
-from scipy.linalg import solve_continuous_are, solve_discrete_are, expm
+from scipy.linalg import solve_discrete_are, expm
 import argparse
 import os
 
 
 def build_state_space(g: float, L: float):
     """
-    Build continuous-time state-space matrices for:
-        x = [px_error, vx, theta, theta_dot]^T
-        u = ax
+    建立连续时间状态空间模型（小角度线性化）
 
-    A = [[0, 1,   0,    0],
-         [0, 0,   0,    0],
-         [0, 0,   0,    1],
-         [0, 0, g/L,    0]]
+    状态 x = [vx, theta, theta_dot]^T
+    输入 u = ax
 
-    B = [[0],
-         [1],
-         [0],
-         [-1/L]]
+    系统方程：
+        vx_dot      = ax
+        theta_dot   = omega
+        omega_dot   = -(g/L) * theta - (1/L) * ax
+
+    对应矩阵：
+        A = [[0,    0,     0],
+             [0,    0,     1],
+             [0,  -g/L,    0]]
+
+        B = [[ 1],
+             [ 0],
+             [-1/L]]
+
+    参数:
+        g: 重力加速度 [m/s^2]
+        L: 绳长 [m]
+
+    返回:
+        A: 3x3 连续状态矩阵
+        B: 3x1 连续输入矩阵
     """
     A = np.array([
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0],
-        [0.0, 0.0, -g / L, 0.0]
+        [0.0, 0.0, 0.0],      # vx_dot = ax
+        [0.0, 0.0, 1.0],      # theta_dot = omega
+        [0.0, -g / L, 0.0]    # omega_dot = -(g/L)*theta - (1/L)*ax
     ], dtype=float)
 
     B = np.array([
-        [0.0],
-        [1.0],
-        [0.0],
-        [-1.0 / L]
+        [1.0],      # 加速度直接影响速度
+        [0.0],      # 加速度不直接影响角度
+        [-1.0 / L]  # 加速度通过惯性力影响角加速度
     ], dtype=float)
 
     return A, B
 
 
 def c2d(A, B, dt):
-    """Zero-order-hold discretization."""
-    n = A.shape[0]
-    m = B.shape[1]
+    """
+    零阶保持（ZOH）离散化
+
+    将连续系统 (A, B) 离散化为 (Ad, Bd)，采样周期为 dt。
+
+    数学原理：
+        Ad = exp(A * dt)
+        Bd = integral_0^dt exp(A*tau) dt * B
+
+    实现方法：构造增广矩阵 M = [[A, B], [0, 0]]，
+              计算矩阵指数 exp(M*dt)，提取左上/右上分块。
+
+    参数:
+        A: 连续状态矩阵 (n x n)
+        B: 连续输入矩阵 (n x m)
+        dt: 采样周期 [s]
+
+    返回:
+        Ad: 离散状态矩阵 (n x n)
+        Bd: 离散输入矩阵 (n x m)
+    """
+    n = A.shape[0]      # 状态维度
+    m = B.shape[1]      # 输入维度
+
+    # 构造增广矩阵：M = [[A, B], [0, 0]]
     M = np.block([
         [A, B],
         [np.zeros((m, n)), np.zeros((m, m))]
     ])
+
+    # 计算矩阵指数 exp(M * dt)
     M_exp = expm(M * dt)
+
+    # 提取离散化后的 A_d 和 B_d
     Ad = M_exp[:n, :n]
     Bd = M_exp[:n, n:]
     return Ad, Bd
 
 
-def generate_lqr_gain(
+def solve_lqr(Ad, Bd, Q_diag, R_val):
+    """
+    求解离散 LQR 的最优反馈增益 K
+
+    性能指标：
+        J = sum(x_k^T * Q * x_k + u_k^T * R * u_k)
+
+    求解步骤：
+        1. 解离散代数 Riccati 方程 (DARE) 得到 P
+        2. 计算最优增益 K = (R + Bd^T P Bd)^{-1} Bd^T P Ad
+
+    参数:
+        Ad: 离散状态矩阵
+        Bd: 离散输入矩阵
+        Q_diag: Q 矩阵的对角线元素 [Q_vx, Q_theta, Q_omega]
+        R_val:  R 矩阵的标量值（单输入系统）
+
+    返回:
+        K: 1x3 最优状态反馈增益向量 [K_vx, K_theta, K_omega]
+    """
+    Q = np.diag(Q_diag)           # 构造对角权重矩阵 Q
+    R = np.array([[R_val]])       # 构造输入权重矩阵 R（标量）
+
+    # 解离散代数 Riccati 方程：P = A^T P A - A^T P B (R+B^T P B)^{-1} B^T P A + Q
+    P = solve_discrete_are(Ad, Bd, Q, R)
+
+    # 计算最优反馈增益 K
+    K = np.linalg.solve(R + Bd.T @ P @ Bd, Bd.T @ P @ Ad).flatten()
+    return K
+
+
+def generate_lqr_gains(
     rope_length: float = 15.0,
     gravity: float = 9.81,
     dt_control: float = 0.02,
-    q_px: float = 1.0,
-    q_vx: float = 0.5,
-    q_theta: float = 10.0,
-    q_omega: float = 1.0,
-    r_ax: float = 1.0,
     output_path: str = None,
 ):
+    """
+    生成三种控制模式的 LQR 增益，并输出为 C++ 头文件
+
+    三种模式的设计哲学：
+
+    1. Full（均衡模式）:
+       Q = [2, 30, 10], R = 2
+       - 速度收敛与摆动抑制兼顾
+       - 适合一般工况
+
+    2. Shortest（最短距离模式）:
+       Q = [8, 2, 1], R = 3
+       - 速度权重较大，摆角权重较小
+       - 优先快速减速，对摆动容忍度较高
+
+    3. MinSwing（最小摆动模式）:
+       Q = [1, 100, 50], R = 2
+       - 摆角和角速度权重很大
+       - 温柔减速，优先抑制摆动
+
+    参数:
+        rope_length: 绳长 [m]
+        gravity:     重力加速度 [m/s^2]
+        dt_control:  控制周期 [s]
+        output_path: 输出文件路径（默认：../include/controller/lqr_gain.hpp）
+    """
+    # Step 1: 建立连续时间模型
     A, B = build_state_space(gravity, rope_length)
+
+    # Step 2: ZOH 离散化
     Ad, Bd = c2d(A, B, dt_control)
 
-    Q = np.diag([q_px, q_vx, q_theta, q_omega])
-    R = np.array([[r_ax]])
+    # Step 3: 求解三种模式的 LQR 增益
+    # Mode 1: Full - 均衡策略
+    K_full = solve_lqr(Ad, Bd, [0.5, 30.0, 100.0], 2.0)
 
-    # Solve discrete-time algebraic Riccati equation
-    P = solve_discrete_are(Ad, Bd, Q, R)
+    # Mode 2: Shortest - 优先速度收敛（最短刹车距离）
+    K_shortest = solve_lqr(Ad, Bd, [8.0, 2.0, 10.0], 3.0)
 
-    # Discrete LQR gain: K = (R + B^T P B)^-1 B^T P A
-    K = np.linalg.solve(R + Bd.T @ P @ Bd, Bd.T @ P @ Ad).flatten()
+    # Mode 3: MinSwing - 优先摆动抑制（温柔刹车）
+    K_minswing = solve_lqr(Ad, Bd, [0.3, 30.0, 600.0], 2.0)
 
+    # Step 4: 打印闭环极点，验证稳定性
     print("=" * 60)
-    print(f"LQR Gain Design Parameters")
-    print("=" * 60)
-    print(f"Rope length L      : {rope_length:.3f} m")
-    print(f"Control period Ts  : {dt_control:.3f} s")
-    print(f"Natural freq wn    : {np.sqrt(gravity/rope_length):.4f} rad/s")
-    print(f"Q = diag({q_px}, {q_vx}, {q_theta}, {q_omega})")
-    print(f"R = [{r_ax}]")
-    print("-" * 60)
-    print(f"Continuous eigenvalues : {np.linalg.eigvals(A)}")
-    print(f"Discrete eigenvalues   : {np.linalg.eigvals(Ad)}")
-    print("-" * 60)
-    print(f"Discrete LQR Gain K = [{K[0]:.6f}, {K[1]:.6f}, {K[2]:.6f}, {K[3]:.6f}]")
+    print(f"LQR 增益设计结果（速度目标制动）")
+    print(f"绳长 L = {rope_length:.3f} m, 控制周期 Ts = {dt_control:.3f} s")
     print("=" * 60)
 
-    # Closed-loop eigenvalues
-    Acl = Ad - Bd @ K.reshape(1, -1)
-    eigs_cl = np.linalg.eigvals(Acl)
-    print(f"Closed-loop discrete eigenvalues: {eigs_cl}")
-    print(f"Max |eig| = {max(abs(eigs_cl)):.4f}")
+    for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing)]:
+        # 闭环矩阵 A_cl = Ad - Bd * K
+        Acl = Ad - Bd @ K.reshape(1, -1)
+        eigs = np.linalg.eigvals(Acl)
+        max_eig = max(abs(eigs))
+
+        print(f"\n{name}:")
+        print(f"  增益 K = [{K[0]:.6f}, {K[1]:.6f}, {K[2]:.6f}]")
+        print(f"  闭环最大特征值 = {max_eig:.4f}", end="")
+        if max_eig < 1.0:
+            print("  ✓ 稳定")
+        else:
+            print("  ✗ 不稳定或临界稳定")
+
     print("=" * 60)
 
+    # Step 5: 确定输出路径
     if output_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         output_path = os.path.join(script_dir, "..", "include", "controller", "lqr_gain.hpp")
         output_path = os.path.abspath(output_path)
 
+    # 确保目标目录存在
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
+    # Step 6: 生成 C++ 头文件内容
     header_content = f"""#pragma once
 
 // AUTO-GENERATED by scripts/compute_lqr_gain.py
 // DO NOT EDIT MANUALLY
+// 此文件由 Python 脚本自动生成，请勿手动修改
 
 namespace pendulum {{
 
-/**
- * @brief Pre-computed discrete-time LQR gain for 1-D pitch slung-load.
- *
- * Design parameters:
- *   L       = {rope_length:.3f} m
- *   Ts      = {dt_control:.3f} s
- *   Q_diag  = [{q_px}, {q_vx}, {q_theta}, {q_omega}]
- *   R       = [{r_ax}]
- *
- * State vector: [px_error, vx, theta, theta_dot]^T
- * Control law:  u = -K * x
- */
+enum class LqrMode {{
+    kFull,        ///< 均衡模式：速度收敛 + 摆动抑制
+    kShortest,    ///< 最短距离模式：优先速度收敛
+    kMinSwing     ///< 最小摆动模式：优先摆动抑制
+}};
+
 struct LqrGain {{
-    static constexpr double kP     = {K[0]:.8f};
-    static constexpr double kV     = {K[1]:.8f};
-    static constexpr double kTheta = {K[2]:.8f};
-    static constexpr double kOmega = {K[3]:.8f};
+    // Full: Q=[2,30,10], R=2
+    static constexpr double kFullV     = {K_full[0]:.8f};
+    static constexpr double kFullTheta = {K_full[1]:.8f};
+    static constexpr double kFullOmega = {K_full[2]:.8f};
+
+    // Shortest: Q=[8,2,1], R=3
+    static constexpr double kShortestV     = {K_shortest[0]:.8f};
+    static constexpr double kShortestTheta = {K_shortest[1]:.8f};
+    static constexpr double kShortestOmega = {K_shortest[2]:.8f};
+
+    // MinSwing: Q=[1,100,50], R=2
+    static constexpr double kMinSwingV     = {K_minswing[0]:.8f};
+    static constexpr double kMinSwingTheta = {K_minswing[1]:.8f};
+    static constexpr double kMinSwingOmega = {K_minswing[2]:.8f};
 }};
 
 }} // namespace pendulum
@@ -142,32 +252,30 @@ struct LqrGain {{
     with open(output_path, "w") as f:
         f.write(header_content)
 
-    print(f"\nGenerated: {output_path}")
-    return K
+    print(f"\n已生成: {output_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compute LQR gain for slung-load system")
-    parser.add_argument("--rope-length", type=float, default=15.0, help="Rope length [m]")
-    parser.add_argument("--gravity", type=float, default=9.81, help="Gravity [m/s^2]")
-    parser.add_argument("--dt", type=float, default=0.02, help="Control period [s]")
-    parser.add_argument("--q-px", type=float, default=1.0, help="Position weight")
-    parser.add_argument("--q-vx", type=float, default=0.5, help="Velocity weight")
-    parser.add_argument("--q-theta", type=float, default=10.0, help="Angle weight")
-    parser.add_argument("--q-omega", type=float, default=1.0, help="Angular rate weight")
-    parser.add_argument("--r-ax", type=float, default=1.0, help="Control weight")
-    parser.add_argument("--output", type=str, default=None, help="Output header file path")
+    """
+    命令行入口
+
+    支持参数：
+        --rope-length: 绳长 [m]，默认 15.0
+        --gravity:     重力加速度 [m/s^2]，默认 9.81
+        --dt:          控制周期 [s]，默认 0.02
+        --output:      输出文件路径，默认 ../include/controller/lqr_gain.hpp
+    """
+    parser = argparse.ArgumentParser(description="计算制动控制的 LQR 增益")
+    parser.add_argument("--rope-length", type=float, default=15.0, help="绳长 [m]")
+    parser.add_argument("--gravity", type=float, default=9.81, help="重力加速度 [m/s^2]")
+    parser.add_argument("--dt", type=float, default=0.02, help="控制周期 [s]")
+    parser.add_argument("--output", type=str, default=None, help="输出文件路径")
     args = parser.parse_args()
 
-    generate_lqr_gain(
+    generate_lqr_gains(
         rope_length=args.rope_length,
         gravity=args.gravity,
         dt_control=args.dt,
-        q_px=args.q_px,
-        q_vx=args.q_vx,
-        q_theta=args.q_theta,
-        q_omega=args.q_omega,
-        r_ax=args.r_ax,
         output_path=args.output,
     )
 

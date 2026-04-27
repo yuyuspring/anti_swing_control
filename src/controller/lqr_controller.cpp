@@ -4,14 +4,30 @@
 
 namespace pendulum {
 
-LqrController::LqrController(const Gain& gain, double axLimit)
-    : K_(gain), axLimit_(axLimit) {}
+LqrController::LqrController(LqrMode mode, double axLimit) : axLimit_(axLimit) {
+    switch (mode) {
+        case LqrMode::kFull:
+            kV_ = LqrGain::kFullV;
+            kTheta_ = LqrGain::kFullTheta;
+            kOmega_ = LqrGain::kFullOmega;
+            break;
+        case LqrMode::kShortest:
+            kV_ = LqrGain::kShortestV;
+            kTheta_ = LqrGain::kShortestTheta;
+            kOmega_ = LqrGain::kShortestOmega;
+            break;
+        case LqrMode::kMinSwing:
+            kV_ = LqrGain::kMinSwingV;
+            kTheta_ = LqrGain::kMinSwingTheta;
+            kOmega_ = LqrGain::kMinSwingOmega;
+            break;
+    }
+}
 
 double LqrController::computeControl(const State& state) const {
-    double u = -(K_.kP * state.pxError +
-                 K_.kV * state.vx +
-                 K_.kTheta * state.theta +
-                 K_.kOmega * state.omega);
+    double u = -(kV_ * state.vx +
+                 kTheta_ * state.theta +
+                 kOmega_ * state.omega);
     return saturate(u, axLimit_);
 }
 

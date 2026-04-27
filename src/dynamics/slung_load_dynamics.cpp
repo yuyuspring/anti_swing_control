@@ -7,10 +7,18 @@
 
 namespace pendulum {
 
-SlungLoadDynamics::SlungLoadDynamics(double ropeLengthM, double dampingRatio)
-    : L_(ropeLengthM), zeta_(dampingRatio) {
+SlungLoadDynamics::SlungLoadDynamics(double ropeLengthM, double vxMax,
+                                     double payloadMass, double dragCoeff,
+                                     double dragArea, double linearDampingCoeff)
+    : L_(ropeLengthM),
+      vxMax_(vxMax),
+      payloadMass_(payloadMass),
+      dragCoeff_(dragCoeff),
+      dragArea_(dragArea),
+      airDensity_(1.225),
+      linearDampingCoeff_(linearDampingCoeff) {
     assert(L_ > 0.0 && "Rope length must be positive");
-    omegaN_ = std::sqrt(kGravity / L_);
+    assert(payloadMass_ > 0.0 && "Payload mass must be positive");
 }
 
 void SlungLoadDynamics::computeDerivative(const SystemState& state,
@@ -26,9 +34,36 @@ void SlungLoadDynamics::computeDerivative(const SystemState& state,
     const double st = std::sin(state.theta);
     const double ct = std::cos(state.theta);
 
-    // Non-linear pendulum equation with linear damping
-    // Corrected sign: theta_ddot = -(g*sin(theta) + ax*cos(theta)) / L - 2*zeta*wn*theta_dot
-    dthetaDot = -(kGravity * st + axMS2 * ct) / L_ - 2.0 * zeta_ * omegaN_ * state.thetaDot;
+    // Non-linear pendulum equation with linear + quadratic damping
+    // theta_ddot = -(g*sin(theta) + ax*cos(theta)) / L - c_lin * theta_dot + drag_term
+    double gravityTorque = kGravity * st;
+    double inertialTorque = axMS2 * ct;
+    double linearDrag = linearDampingCoeff_ * state.thetaDot;
+
+    // === Air drag based on payload absolute velocity ===
+    // Payload absolute velocity in inertial frame (NEU: x-forward, z-up)
+    //   vx_payload = vx_drone + L * theta_dot * cos(theta)
+    //   vz_payload = L * theta_dot * sin(theta)
+    double vxPay = state.droneVx + L_ * state.thetaDot * ct;
+    double vzPay = L_ * state.thetaDot * st;
+    double vAbsSq = vxPay * vxPay + vzPay * vzPay;
+    double vAbs = std::sqrt(vAbsSq);
+
+    double quadraticDragThetaDDot = 0.0;
+    if (vAbs > 1e-6) {
+        // Drag force magnitude: 0.5 * rho * Cd * A * |v|^2
+        double dragForceMag = 0.5 * airDensity_ * dragCoeff_ * dragArea_ * vAbsSq;
+        // Drag vector (opposite to velocity)
+        double fDragX = -dragForceMag * vxPay / vAbs;
+        double fDragZ = -dragForceMag * vzPay / vAbs;
+        // Tangential direction (perpendicular to rope, theta-increasing)
+        // e_t = (cos(theta), sin(theta))
+        double fTangential = fDragX * ct + fDragZ * st;
+        // tau = f_tangential * L,  I = m * L^2  =>  thetaDDot_drag = tau / I
+        quadraticDragThetaDDot = fTangential / (payloadMass_ * L_);
+    }
+
+    dthetaDot = -(gravityTorque + inertialTorque) / L_ - linearDrag + quadraticDragThetaDDot;
 }
 
 void SlungLoadDynamics::step(SystemState& state, double axMS2, double dt) {
@@ -66,6 +101,9 @@ void SlungLoadDynamics::step(SystemState& state, double axMS2, double dt) {
     state.theta    += (k1_t  + 2.0 * k2_t  + 2.0 * k3_t  + k4_t)  * dt / 6.0;
     state.thetaDot += (k1_td + 2.0 * k2_td + 2.0 * k3_td + k4_td) * dt / 6.0;
     state.time += dt;
+
+    // Velocity saturation
+    state.droneVx = clamp(state.droneVx, -vxMax_, vxMax_);
 }
 
 } // namespace pendulum

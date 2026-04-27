@@ -11,20 +11,31 @@
 
 namespace pendulum {
 
-/**
- * @brief Configuration for closed-loop LQR simulation.
- */
+enum class ControlMode {
+    kFull,       ///< 最短刹车距离 + 最小摆角
+    kShortest,   ///< 最短刹车距离
+    kMinSwing    ///< 最小摆角
+};
 struct ClosedLoopConfig {
     double dtTruth = 0.001;          ///< Ground-truth dynamics step [s]
     double dtControl = 0.02;         ///< Control / observer period [s]
     double ropeLength = 15.0;        ///< [m]
     double axMax = 3.0;              ///< Max horizontal acceleration [m/s^2]
-    double tFinal = 40.0;            ///< Total simulation time [s]
+    double vxMax = 15.0;             ///< Max horizontal velocity [m/s]
+    double jerkMax = 2.0;            ///< Max jerk [m/s^3]
+    ControlMode mode = ControlMode::kFull; ///< Control strategy
+    double tFinal = 60.0;            ///< Total simulation time [s]
     double pStart = 0.0;             ///< Initial position [m]
-    double pTarget = 50.0;           ///< Target position [m]
-    double initialTheta = 0.1;       ///< Initial pendulum angle [rad]
+    double cruiseSpeed = 15.0;       ///< Cruise speed during constant-velocity phase [m/s]
+    double brakeStartTime = 40.0;    ///< Time to start braking [s]
+    double initialTheta = 0.0;       ///< Initial pendulum angle [rad]
     double initialThetaDot = 0.0;    ///< Initial angular rate [rad/s]
-    double dampingRatio = 0.06;      ///< Pendulum damping ratio
+
+    // Damping parameters
+    double payloadMass = 150.0;      ///< Payload mass [kg]
+    double dragCoeff = 1.0;          ///< Drag coefficient Cd [-]
+    double dragArea = 0.5;           ///< Reference area [m^2]
+    double linearDampingCoeff = 0.15; ///< Linear damping coefficient [1/s]
 
     // Sensor noise std-devs
     double gyroNoiseStd = 0.005;     ///< [rad/s]
@@ -40,7 +51,7 @@ struct ClosedLoopConfig {
  */
 class ClosedLoopSimulation {
 public:
-    explicit ClosedLoopSimulation(const ClosedLoopConfig& config);
+    ClosedLoopSimulation(const ClosedLoopConfig& config, ControlMode mode);
 
     /**
      * @brief Run the full simulation.
@@ -56,6 +67,7 @@ public:
 
 private:
     ClosedLoopConfig config_;
+    ControlMode mode_;
     SlungLoadDynamics dynamics_;
     PendulumObserver observer_;
     LqrController controller_;

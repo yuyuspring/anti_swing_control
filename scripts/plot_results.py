@@ -97,6 +97,7 @@ def main():
     fig.tight_layout()
     fig.savefig(output_path, dpi=180)
     print(f"saved plot to {output_path}")
+    plt.show()
 
 
 if __name__ == "__main__":

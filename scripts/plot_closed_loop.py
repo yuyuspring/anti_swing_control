@@ -68,7 +68,7 @@ def plot_closed_loop(csv_path: str, png_path: str = None):
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig(png_path, dpi=150)
     print(f"Plot saved to: {png_path}")
-    plt.close()
+    plt.show()
 
     # Print summary statistics
     print("\n" + "=" * 50)

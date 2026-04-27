@@ -9,12 +9,14 @@
 
 namespace pendulum {
 
-ClosedLoopSimulation::ClosedLoopSimulation(const ClosedLoopConfig& config)
+ClosedLoopSimulation::ClosedLoopSimulation(const ClosedLoopConfig& config,
+                                             ControlMode mode)
     : config_(config),
-      dynamics_(config.ropeLength, config.dampingRatio),
-      controller_(LqrController::Gain{LqrGain::kP, LqrGain::kV,
-                                       LqrGain::kTheta, LqrGain::kOmega},
-                  config.axMax) {
+      mode_(mode),
+      dynamics_(config.ropeLength, config.vxMax,
+                config.payloadMass, config.dragCoeff, config.dragArea,
+                config.linearDampingCoeff),
+      controller_(static_cast<LqrMode>(mode), config.axMax) {
     sensor_.setNoiseStd(config.gyroNoiseStd,
                         config.accelNoiseStd,
                         config.velNoiseStd);
@@ -45,28 +47,40 @@ void ClosedLoopSimulation::run() {
     log_.clear();
     log_.reserve(static_cast<size_t>(config_.tFinal / config_.dtTruth) + 10);
 
-    double axCmd = 0.0;
+    double axTarget = 0.0;   // LQR / open-loop target acceleration
+    double axCmd = 0.0;      // Actual acceleration after jerk limiting
     PendulumObserver::Output est{};
 
     const int controlStepsPerCall =
         static_cast<int>(std::round(config_.dtControl / config_.dtTruth));
     int stepCounter = 0;
 
+    // Compute acceleration phase end time
+    const double accelPhaseEnd = config_.cruiseSpeed / config_.axMax;
+
     std::cout << "[ClosedLoopSimulation] Starting simulation...\n"
-              << "  Target position : " << config_.pTarget << " m\n"
+              << "  Mode            : "
+              << (mode_ == ControlMode::kFull ? "Full" :
+                  mode_ == ControlMode::kShortest ? "Shortest" : "MinSwing")
+              << "\n"
+              << "  Start position  : " << config_.pStart << " m\n"
+              << "  Cruise speed    : " << config_.cruiseSpeed << " m/s\n"
+              << "  Accel phase     : 0 ~ " << accelPhaseEnd << " s\n"
+              << "  Cruise phase    : " << accelPhaseEnd << " ~ " << config_.brakeStartTime << " s\n"
+              << "  Brake phase     : " << config_.brakeStartTime << " ~ " << config_.tFinal << " s\n"
               << "  Rope length     : " << config_.ropeLength << " m\n"
               << "  Max acceleration: " << config_.axMax << " m/s^2\n"
+              << "  Max velocity    : " << config_.vxMax << " m/s\n"
+              << "  Max jerk        : " << config_.jerkMax << " m/s^3\n"
               << "  Initial theta   : " << rad2deg(config_.initialTheta) << " deg\n"
               << "  Duration        : " << config_.tFinal << " s\n"
               << "  Control period  : " << config_.dtControl << " s\n";
 
     while (state.time <= config_.tFinal + 1e-9) {
-        // Control update at every dtControl interval
+        // Observer update at every dtControl interval (runs in all phases)
         if (stepCounter % controlStepsPerCall == 0) {
-            // 1. Sensor measurement from truth
             auto meas = sensor_.generate(state, 0.0, config_.ropeLength);
 
-            // 2. Observer update
             PendulumObserver::Input obsInput;
             obsInput.gyroRadS = meas.gyro;
             obsInput.accelMS2 = meas.accel;
@@ -74,29 +88,47 @@ void ClosedLoopSimulation::run() {
             obsInput.yawRad = meas.yaw;
             observer_.update(obsInput, config_.ropeLength);
             est = observer_.getOutput();
-
-            // 3. LQR control
-            LqrController::State lqrState;
-            lqrState.pxError = state.dronePx - config_.pTarget;
-            lqrState.vx = state.droneVx;
-            lqrState.theta = est.thetaPitch;
-            lqrState.omega = est.omegaPitch;
-
-            axCmd = controller_.computeControl(lqrState);
         }
 
-        // 4. Record before stepping
+        // Phase-dependent control: compute target acceleration
+        if (state.time < accelPhaseEnd) {
+            // Phase 1: Acceleration
+            axTarget = config_.axMax;
+        } else if (state.time < config_.brakeStartTime) {
+            // Phase 2: Constant velocity
+            axTarget = 0.0;
+        } else {
+            // Phase 3: Braking (LQR takes over)
+            if (stepCounter % controlStepsPerCall == 0) {
+                LqrController::State lqrState;
+                lqrState.vx = state.droneVx;
+                lqrState.theta = est.thetaPitch;
+                lqrState.omega = est.omegaPitch;
+                axTarget = controller_.computeControl(lqrState);
+            }
+        }
+
+        // Apply jerk limit: axCmd can only change by jerkMax * dt per step
+        double jerk = (axTarget - axCmd) / config_.dtTruth;
+        if (jerk > config_.jerkMax) {
+            axCmd += config_.jerkMax * config_.dtTruth;
+        } else if (jerk < -config_.jerkMax) {
+            axCmd -= config_.jerkMax * config_.dtTruth;
+        } else {
+            axCmd = axTarget;
+        }
+
+        // Record before stepping
         ClosedLoopLogEntry entry;
         entry.time = state.time;
         entry.truth = state;
         entry.thetaEstimate = est.thetaPitch;
         entry.omegaEstimate = est.omegaPitch;
-        entry.axCommand = axCmd;
-        entry.axApplied = axCmd;  // No actuator dynamics for now
-        entry.pxError = state.dronePx - config_.pTarget;
+        entry.axCommand = axTarget;
+        entry.axApplied = axCmd;
         log_.push_back(entry);
 
-        // 5. Advance true dynamics
+        // Advance true dynamics
         dynamics_.step(state, axCmd, config_.dtTruth);
 
         ++stepCounter;
@@ -118,8 +150,7 @@ void ClosedLoopSimulation::saveResults(const std::string& filename) const {
         "px_truth_m", "vx_truth_m_s",
         "theta_truth_rad", "theta_dot_truth_rad_s",
         "theta_est_rad", "omega_est_rad_s",
-        "ax_cmd_m_s2", "ax_applied_m_s2",
-        "px_error_m"
+        "ax_cmd_m_s2", "ax_applied_m_s2"
     });
 
     for (const auto& e : log_) {
@@ -132,8 +163,7 @@ void ClosedLoopSimulation::saveResults(const std::string& filename) const {
             e.thetaEstimate,
             e.omegaEstimate,
             e.axCommand,
-            e.axApplied,
-            e.pxError
+            e.axApplied
         });
     }
 

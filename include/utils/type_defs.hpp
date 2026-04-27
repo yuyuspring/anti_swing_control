@@ -49,7 +49,6 @@ struct ClosedLoopLogEntry {
     double omegaEstimate = 0.0;    ///< Observed angular rate [rad/s]
     double axCommand = 0.0;        ///< LQR commanded acceleration [m/s^2]
     double axApplied = 0.0;        ///< Actual acceleration after saturation [m/s^2]
-    double pxError = 0.0;          ///< Position error (truth - target) [m]
 };
 
 } // namespace pendulum
