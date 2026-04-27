@@ -104,7 +104,7 @@ def c2d(A, B, dt):
     return Ad, Bd
 
 
-def solve_lqr(Ad, Bd, Q_diag, R_val):
+def solve_lqr(Ad, Bd, Q, R_val):
     """
     求解离散 LQR 的最优反馈增益 K
 
@@ -118,13 +118,14 @@ def solve_lqr(Ad, Bd, Q_diag, R_val):
     参数:
         Ad: 离散状态矩阵
         Bd: 离散输入矩阵
-        Q_diag: Q 矩阵的对角线元素 [Q_vx, Q_theta, Q_omega]
+        Q: Q 权重矩阵（3x3 numpy array 或对角线列表 [Q_vx, Q_theta, Q_omega]）
         R_val:  R 矩阵的标量值（单输入系统）
 
     返回:
         K: 1x3 最优状态反馈增益向量 [K_vx, K_theta, K_omega]
     """
-    Q = np.diag(Q_diag)           # 构造对角权重矩阵 Q
+    if isinstance(Q, (list, tuple)):
+        Q = np.diag(Q)            # 构造对角权重矩阵 Q
     R = np.array([[R_val]])       # 构造输入权重矩阵 R（标量）
 
     # 解离散代数 Riccati 方程：P = A^T P A - A^T P B (R+B^T P B)^{-1} B^T P A + Q
@@ -186,13 +187,26 @@ def generate_lqr_gains(
     # Mode 4: VelocityOmega - 同时抑制速度和角速度
     K_velomega = solve_lqr(Ad, Bd, [10.0, 1.0, 100.0], 2.0)
 
+    # Mode 5: PayloadVelocity - 惩罚 payload 绝对水平速度 (vx + L*omega)
+    # 代价函数中增加 q_pay * (vx + L*omega)^2 项
+    q_pay = 4.0
+    q_theta = 1.0
+    q_omega_extra = 0.1
+    Q_payload = np.array([
+        [q_pay, 0.0, q_pay * rope_length],
+        [0.0, q_theta, 0.0],
+        [q_pay * rope_length, 0.0, q_pay * rope_length**2 + q_omega_extra]
+    ], dtype=float)
+    K_payload = solve_lqr(Ad, Bd, Q_payload, 2.0)
+
     # Step 4: 打印闭环极点，验证稳定性
     print("=" * 60)
     print(f"LQR 增益设计结果（速度目标制动）")
     print(f"绳长 L = {rope_length:.3f} m, 控制周期 Ts = {dt_control:.3f} s")
     print("=" * 60)
 
-    for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing), ("VelocityOmega", K_velomega)]:
+    for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing),
+                    ("VelocityOmega", K_velomega), ("PayloadVelocity", K_payload)]:
         # 闭环矩阵 A_cl = Ad - Bd * K
         Acl = Ad - Bd @ K.reshape(1, -1)
         eigs = np.linalg.eigvals(Acl)
@@ -230,7 +244,8 @@ enum class LqrMode {{
     kFull,          ///< 均衡模式：速度收敛 + 摆动抑制
     kShortest,      ///< 最短距离模式：优先速度收敛
     kMinSwing,      ///< 最小摆动模式：优先摆动抑制
-    kVelocityOmega  ///< 速度+角速度模式：同时抑制速度和平抑角速度
+    kVelocityOmega,   ///< 速度+角速度模式：同时抑制速度和平抑角速度
+    kPayloadVelocity  ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
 }};
 
 struct LqrGain {{
@@ -253,6 +268,11 @@ struct LqrGain {{
     static constexpr double kVelocityOmegaV     = {K_velomega[0]:.8f};
     static constexpr double kVelocityOmegaTheta = {K_velomega[1]:.8f};
     static constexpr double kVelocityOmegaOmega = {K_velomega[2]:.8f};
+
+    // PayloadVelocity: Q penalizes (vx + L*omega)^2, R=2
+    static constexpr double kPayloadVelocityV     = {K_payload[0]:.8f};
+    static constexpr double kPayloadVelocityTheta = {K_payload[1]:.8f};
+    static constexpr double kPayloadVelocityOmega = {K_payload[2]:.8f};
 }};
 
 }} // namespace pendulum

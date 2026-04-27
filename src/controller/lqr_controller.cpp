@@ -26,6 +26,11 @@ LqrController::LqrController(LqrMode mode, double axLimit) : axLimit_(axLimit) {
             kTheta_ = LqrGain::kVelocityOmegaTheta;
             kOmega_ = LqrGain::kVelocityOmegaOmega;
             break;
+        case LqrMode::kPayloadVelocity:
+            kV_ = LqrGain::kPayloadVelocityV;
+            kTheta_ = LqrGain::kPayloadVelocityTheta;
+            kOmega_ = LqrGain::kPayloadVelocityOmega;
+            break;
     }
 }
 

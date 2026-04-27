@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare four control modes: Full, Shortest, MinSwing, VelocityOmega."""
+"""Compare five control modes: Full, Shortest, MinSwing, VelocityOmega, PayloadVelocity."""
 
 import sys
 import pandas as pd
@@ -29,7 +29,7 @@ def plot_comparison(files, labels, output_path="comparison.png"):
         sys.exit(1)
 
     data = [load_and_label(f, l) for f, l in zip(files, labels)]
-    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red", "VelocityOmega": "purple"}
+    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red", "VelocityOmega": "purple", "PayloadVelocity": "orange"}
 
     # Auto-detect brake start from first dataset (all should be same)
     t_brake, px_brake = detect_brake_start(data[0])
@@ -130,10 +130,10 @@ def plot_comparison(files, labels, output_path="comparison.png"):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
-        print("Usage: python3 plot_comparison.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv>")
+    if len(sys.argv) < 6:
+        print("Usage: python3 plot_comparison.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv> <payload.csv>")
         sys.exit(1)
     plot_comparison(
-        [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]],
-        ["Full", "Shortest", "MinSwing", "VelocityOmega"]
+        [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]],
+        ["Full", "Shortest", "MinSwing", "VelocityOmega", "PayloadVelocity"]
     )
