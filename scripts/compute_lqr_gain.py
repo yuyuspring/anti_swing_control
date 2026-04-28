@@ -189,8 +189,8 @@ def generate_lqr_gains(
 
     # Mode 5: PayloadVelocity - 惩罚 payload 绝对水平速度 (vx + L*omega)
     # 代价函数中增加 q_pay * (vx + L*omega)^2 项
-    q_pay = 4.0
-    q_theta = 1.0
+    q_pay = 2.0
+    q_theta = 30.0
     q_omega_extra = 1.0
     Q_payload = np.array([
         [q_pay, 0.0, q_pay * rope_length],
@@ -202,8 +202,8 @@ def generate_lqr_gains(
     # Mode 6: MinEnergy - 最小化摆动能量（势能 + 绝对速度动能）
     # 能量 E ≈ 0.5*m*g*L*theta^2 + 0.5*m*(vx + L*omega)^2
     # Q 矩阵同时惩罚 theta^2 和 (vx + L*omega)^2
-    q_ke = 2.0    # 动能惩罚系数（基于绝对速度）
-    q_pe = 30.0   # 势能惩罚系数
+    q_ke = 5.0    # 动能惩罚系数（基于绝对速度）
+    q_pe = 1.0   # 势能惩罚系数
     q_omega_extra_energy = 1.0  # 确保正定的微小正则项
     Q_minenergy = np.array([
         [q_ke, 0.0, q_ke * rope_length],
@@ -211,6 +211,20 @@ def generate_lqr_gains(
         [q_ke * rope_length, 0.0, q_ke * rope_length**2 + q_omega_extra_energy]
     ], dtype=float)
     K_minenergy = solve_lqr(Ad, Bd, Q_minenergy, 2.0)
+
+    # Mode 7: SystemEnergy - 最小化系统总能量（无人机动能 + 摆势能 + 摆动能）
+    # E_total = 0.5*M*vx^2 + 0.5*m*g*L*theta^2 + 0.5*m*(vx + L*omega)^2
+    # 在 MinEnergy 基础上额外增加无人机动能惩罚 q_drone * vx^2
+    q_ke_sys = 5.0     # 摆动能惩罚系数（与 MinEnergy 相同）
+    q_pe_sys = 1.0     # 摆势能惩罚系数（与 MinEnergy 相同）
+    q_drone = 5.0      # 无人机动能惩罚系数（M=120kg, m=150kg, 比例≈0.8）
+    q_omega_extra_sys = 1.0
+    Q_systemenergy = np.array([
+        [q_drone + q_ke_sys, 0.0, q_ke_sys * rope_length],
+        [0.0, q_pe_sys, 0.0],
+        [q_ke_sys * rope_length, 0.0, q_ke_sys * rope_length**2 + q_omega_extra_sys]
+    ], dtype=float)
+    K_systemenergy = solve_lqr(Ad, Bd, Q_systemenergy, 2.0)
 
     # Step 4: 打印闭环极点，验证稳定性
     print("=" * 60)
@@ -220,7 +234,7 @@ def generate_lqr_gains(
 
     for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing),
                     ("VelocityOmega", K_velomega), ("PayloadVelocity", K_payload),
-                    ("MinEnergy", K_minenergy)]:
+                    ("MinEnergy", K_minenergy), ("SystemEnergy", K_systemenergy)]:
         # 闭环矩阵 A_cl = Ad - Bd * K
         Acl = Ad - Bd @ K.reshape(1, -1)
         eigs = np.linalg.eigvals(Acl)
@@ -270,7 +284,8 @@ enum class LqrMode {{
     kMinSwing,      ///< 最小摆动模式：优先摆动抑制
     kVelocityOmega,   ///< 速度+角速度模式：同时抑制速度和平抑角速度
     kPayloadVelocity, ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
-    kMinEnergy        ///< 最小能量模式：惩罚摆动能量（势能 + 绝对速度动能）
+    kMinEnergy,       ///< 最小能量模式：惩罚摆动能量（势能 + 绝对速度动能）
+    kSystemEnergy     ///< 系统总能量最低：无人机+摆能量
 }};
 
 struct LqrGain {{
@@ -303,6 +318,11 @@ struct LqrGain {{
     static constexpr double kMinEnergyV     = {K_minenergy[0]:.8f};
     static constexpr double kMinEnergyTheta = {K_minenergy[1]:.8f};
     static constexpr double kMinEnergyOmega = {K_minenergy[2]:.8f};
+
+    // SystemEnergy: Q penalizes drone KE + pendulum energy, R=2
+    static constexpr double kSystemEnergyV     = {K_systemenergy[0]:.8f};
+    static constexpr double kSystemEnergyTheta = {K_systemenergy[1]:.8f};
+    static constexpr double kSystemEnergyOmega = {K_systemenergy[2]:.8f};
 }};
 
 }} // namespace pendulum

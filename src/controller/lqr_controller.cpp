@@ -36,6 +36,11 @@ LqrController::LqrController(LqrMode mode, double axLimit) : axLimit_(axLimit) {
             kTheta_ = LqrGain::kMinEnergyTheta;
             kOmega_ = LqrGain::kMinEnergyOmega;
             break;
+        case LqrMode::kSystemEnergy:
+            kV_ = LqrGain::kSystemEnergyV;
+            kTheta_ = LqrGain::kSystemEnergyTheta;
+            kOmega_ = LqrGain::kSystemEnergyOmega;
+            break;
     }
 }
 

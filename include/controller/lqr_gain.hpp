@@ -12,7 +12,8 @@ enum class LqrMode {
     kMinSwing,      ///< 最小摆动模式：优先摆动抑制
     kVelocityOmega,   ///< 速度+角速度模式：同时抑制速度和平抑角速度
     kPayloadVelocity, ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
-    kMinEnergy        ///< 最小能量模式：惩罚摆动能量（势能 + 绝对速度动能）
+    kMinEnergy,       ///< 最小能量模式：惩罚摆动能量（势能 + 绝对速度动能）
+    kSystemEnergy     ///< 系统总能量最低：无人机+摆能量
 };
 
 struct LqrGain {
@@ -37,14 +38,19 @@ struct LqrGain {
     static constexpr double kVelocityOmegaOmega = -2.93945274;
 
     // PayloadVelocity: Q penalizes (vx + L*omega)^2, R=2
-    static constexpr double kPayloadVelocityV     = 1.39298637;
-    static constexpr double kPayloadVelocityTheta = -16.87062001;
-    static constexpr double kPayloadVelocityOmega = -1.61984222;
+    static constexpr double kPayloadVelocityV     = 0.98727532;
+    static constexpr double kPayloadVelocityTheta = -12.09964413;
+    static constexpr double kPayloadVelocityOmega = -4.27763263;
 
     // MinEnergy: Q penalizes energy = g*L*theta^2 + (vx + L*omega)^2, R=2
-    static constexpr double kMinEnergyV     = 0.98727532;
-    static constexpr double kMinEnergyTheta = -12.09964413;
-    static constexpr double kMinEnergyOmega = -4.27763263;
+    static constexpr double kMinEnergyV     = 1.55603116;
+    static constexpr double kMinEnergyTheta = -18.89273871;
+    static constexpr double kMinEnergyOmega = -0.47858966;
+
+    // SystemEnergy: Q penalizes drone KE + pendulum energy, R=2
+    static constexpr double kSystemEnergyV     = 2.18632068;
+    static constexpr double kSystemEnergyTheta = -18.77173039;
+    static constexpr double kSystemEnergyOmega = -0.39319997;
 };
 
 } // namespace pendulum

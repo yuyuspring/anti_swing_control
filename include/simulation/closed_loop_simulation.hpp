@@ -17,7 +17,8 @@ enum class ControlMode {
     kMinSwing,      ///< 最小摆角
     kVelocityOmega,   ///< 速度+角速度联合抑制
     kPayloadVelocity, ///< payload 绝对速度抑制
-    kMinEnergy        ///< 最小能量模式
+    kMinEnergy,       ///< 最小能量模式
+    kSystemEnergy     ///< 系统总能量最低（无人机+摆）
 };
 struct ClosedLoopConfig {
     double dtTruth = 0.001;          ///< Ground-truth dynamics step [s]
