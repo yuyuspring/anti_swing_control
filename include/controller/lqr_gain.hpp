@@ -11,7 +11,8 @@ enum class LqrMode {
     kShortest,      ///< 最短距离模式：优先速度收敛
     kMinSwing,      ///< 最小摆动模式：优先摆动抑制
     kVelocityOmega,   ///< 速度+角速度模式：同时抑制速度和平抑角速度
-    kPayloadVelocity  ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
+    kPayloadVelocity, ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
+    kMinEnergy        ///< 最小能量模式：惩罚摆动能量（势能 + 绝对速度动能）
 };
 
 struct LqrGain {
@@ -39,6 +40,11 @@ struct LqrGain {
     static constexpr double kPayloadVelocityV     = 1.39298637;
     static constexpr double kPayloadVelocityTheta = -16.87062001;
     static constexpr double kPayloadVelocityOmega = -1.61984222;
+
+    // MinEnergy: Q penalizes energy = g*L*theta^2 + (vx + L*omega)^2, R=2
+    static constexpr double kMinEnergyV     = 0.98727532;
+    static constexpr double kMinEnergyTheta = -12.09964413;
+    static constexpr double kMinEnergyOmega = -4.27763263;
 };
 
 } // namespace pendulum

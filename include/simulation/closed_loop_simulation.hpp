@@ -16,7 +16,8 @@ enum class ControlMode {
     kShortest,      ///< 最短刹车距离
     kMinSwing,      ///< 最小摆角
     kVelocityOmega,   ///< 速度+角速度联合抑制
-    kPayloadVelocity  ///< payload 绝对速度抑制
+    kPayloadVelocity, ///< payload 绝对速度抑制
+    kMinEnergy        ///< 最小能量模式
 };
 struct ClosedLoopConfig {
     double dtTruth = 0.001;          ///< Ground-truth dynamics step [s]

@@ -5,7 +5,7 @@
 
 void printUsage(const char* prog) {
     std::cout << "Usage: " << prog << " <mode> [initial_theta] [rope_length] [duration]\n"
-              << "  mode: 0=Full, 1=Shortest, 2=MinSwing, 3=VelocityOmega, 4=PayloadVelocity\n"
+              << "  mode: 0=Full, 1=Shortest, 2=MinSwing, 3=VelocityOmega, 4=PayloadVelocity, 5=MinEnergy\n"
               << "  default: mode=0, theta=0.1rad, rope=15m, duration=60s\n";
 }
 
@@ -19,6 +19,7 @@ int main(int argc, char* argv[]) {
         else if (modeInt == 2) mode = pendulum::ControlMode::kMinSwing;
         else if (modeInt == 3) mode = pendulum::ControlMode::kVelocityOmega;
         else if (modeInt == 4) mode = pendulum::ControlMode::kPayloadVelocity;
+        else if (modeInt == 5) mode = pendulum::ControlMode::kMinEnergy;
     }
     if (argc > 2) config.initialTheta = std::stod(argv[2]);
     if (argc > 3) config.ropeLength = std::stod(argv[3]);
@@ -38,6 +39,7 @@ int main(int argc, char* argv[]) {
         case pendulum::ControlMode::kMinSwing: filename = "closed_loop_minswing.csv"; break;
         case pendulum::ControlMode::kVelocityOmega: filename = "closed_loop_velomega.csv"; break;
         case pendulum::ControlMode::kPayloadVelocity: filename = "closed_loop_payload.csv"; break;
+        case pendulum::ControlMode::kMinEnergy: filename = "closed_loop_minenergy.csv"; break;
     }
     sim.saveResults(filename);
 

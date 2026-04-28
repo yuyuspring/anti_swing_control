@@ -102,10 +102,11 @@ Default parameters:
 ### Custom Parameters
 
 ```bash
-./run_closed_loop_lqr <target_position> <initial_theta_rad> <rope_length> <duration>
+./run_closed_loop_lqr <mode> [initial_theta] [rope_length] [duration]
 
-# Example: 0m -> 30m, initial angle 5° (0.087 rad), rope 10m, 20s
-./run_closed_loop_lqr 30.0 0.087 10.0 20.0
+# Modes: 0=Full, 1=Shortest, 2=MinSwing, 3=VelocityOmega, 4=PayloadVelocity, 5=MinEnergy
+# Example: MinEnergy mode, initial angle 5° (0.087 rad), rope 10m, 20s
+./run_closed_loop_lqr 5 0.087 10.0 20.0
 ```
 
 ### Plot Results

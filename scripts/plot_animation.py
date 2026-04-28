@@ -40,7 +40,7 @@ def create_animation(files, labels, output_path="lqr_animation.mp4", phase="brak
     """
     data = [load_and_label(f, l) for f, l in zip(files, labels)]
     colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red",
-              "VelocityOmega": "purple", "PayloadVelocity": "orange"}
+              "VelocityOmega": "purple", "PayloadVelocity": "orange", "MinEnergy": "brown"}
 
     t_brake = detect_brake_start(data[0])
     if t_brake is None:
@@ -250,6 +250,7 @@ if __name__ == "__main__":
         os.path.join(build_dir, "closed_loop_minswing.csv"),
         os.path.join(build_dir, "closed_loop_velomega.csv"),
         os.path.join(build_dir, "closed_loop_payload.csv"),
+        os.path.join(build_dir, "closed_loop_minenergy.csv"),
     ]
     if len(sys.argv) < 6 and all(os.path.exists(f) for f in default_files):
         # Inject default files before argparse sees the args

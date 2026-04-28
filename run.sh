@@ -76,6 +76,7 @@ make -j$(nproc)
 ./run_closed_loop_lqr 2
 ./run_closed_loop_lqr 3
 ./run_closed_loop_lqr 4
+./run_closed_loop_lqr 5
 
 echo ""
 echo "========================================"
@@ -86,22 +87,22 @@ if [[ "$MODE" == "all" || "$MODE" == "comparison" ]]; then
     echo "--> Generating comparison.png ..."
     python3 ../scripts/plot_comparison.py \
         closed_loop_full.csv closed_loop_shortest.csv \
-        closed_loop_minswing.csv closed_loop_velomega.csv closed_loop_payload.csv
+        closed_loop_minswing.csv closed_loop_velomega.csv closed_loop_payload.csv closed_loop_minenergy.csv
 fi
 
 if [[ "$MODE" == "all" || "$MODE" == "brake" ]]; then
     echo "--> Generating brake_phase.png ..."
     python3 ../scripts/plot_brake_phase.py \
         closed_loop_full.csv closed_loop_shortest.csv \
-        closed_loop_minswing.csv closed_loop_velomega.csv closed_loop_payload.csv
+        closed_loop_minswing.csv closed_loop_velomega.csv closed_loop_payload.csv closed_loop_minenergy.csv
 fi
 
 if [[ "$MODE" == "all" || "$MODE" == "animation" ]]; then
     echo "--> Generating lqr_brake_animation.mp4 ..."
     python3 ../scripts/plot_animation.py \
         closed_loop_full.csv closed_loop_shortest.csv \
-        closed_loop_minswing.csv closed_loop_velomega.csv closed_loop_payload.csv \
-        --labels Full Shortest MinSwing VelocityOmega PayloadVelocity \
+        closed_loop_minswing.csv closed_loop_velomega.csv closed_loop_payload.csv closed_loop_minenergy.csv \
+        --labels Full Shortest MinSwing VelocityOmega PayloadVelocity MinEnergy \
         --phase brake --output lqr_brake_animation.mp4 --fps 30 --duration 10
 fi
 

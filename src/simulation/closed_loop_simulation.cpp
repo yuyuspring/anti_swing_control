@@ -63,7 +63,8 @@ void ClosedLoopSimulation::run() {
               << (mode_ == ControlMode::kFull ? "Full" :
                   mode_ == ControlMode::kShortest ? "Shortest" :
                   mode_ == ControlMode::kMinSwing ? "MinSwing" :
-                      mode_ == ControlMode::kVelocityOmega ? "VelocityOmega" : "PayloadVelocity")
+                  mode_ == ControlMode::kVelocityOmega ? "VelocityOmega" :
+                  mode_ == ControlMode::kPayloadVelocity ? "PayloadVelocity" : "MinEnergy")
               << "\n"
               << "  Start position  : " << config_.pStart << " m\n"
               << "  Cruise speed    : " << config_.cruiseSpeed << " m/s\n"

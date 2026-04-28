@@ -199,6 +199,19 @@ def generate_lqr_gains(
     ], dtype=float)
     K_payload = solve_lqr(Ad, Bd, Q_payload, 2.0)
 
+    # Mode 6: MinEnergy - 最小化摆动能量（势能 + 绝对速度动能）
+    # 能量 E ≈ 0.5*m*g*L*theta^2 + 0.5*m*(vx + L*omega)^2
+    # Q 矩阵同时惩罚 theta^2 和 (vx + L*omega)^2
+    q_ke = 2.0    # 动能惩罚系数（基于绝对速度）
+    q_pe = 30.0   # 势能惩罚系数
+    q_omega_extra_energy = 1.0  # 确保正定的微小正则项
+    Q_minenergy = np.array([
+        [q_ke, 0.0, q_ke * rope_length],
+        [0.0, q_pe, 0.0],
+        [q_ke * rope_length, 0.0, q_ke * rope_length**2 + q_omega_extra_energy]
+    ], dtype=float)
+    K_minenergy = solve_lqr(Ad, Bd, Q_minenergy, 2.0)
+
     # Step 4: 打印闭环极点，验证稳定性
     print("=" * 60)
     print(f"LQR 增益设计结果（速度目标制动）")
@@ -206,7 +219,8 @@ def generate_lqr_gains(
     print("=" * 60)
 
     for name, K in [("Full", K_full), ("Shortest", K_shortest), ("MinSwing", K_minswing),
-                    ("VelocityOmega", K_velomega), ("PayloadVelocity", K_payload)]:
+                    ("VelocityOmega", K_velomega), ("PayloadVelocity", K_payload),
+                    ("MinEnergy", K_minenergy)]:
         # 闭环矩阵 A_cl = Ad - Bd * K
         Acl = Ad - Bd @ K.reshape(1, -1)
         eigs = np.linalg.eigvals(Acl)
@@ -255,7 +269,8 @@ enum class LqrMode {{
     kShortest,      ///< 最短距离模式：优先速度收敛
     kMinSwing,      ///< 最小摆动模式：优先摆动抑制
     kVelocityOmega,   ///< 速度+角速度模式：同时抑制速度和平抑角速度
-    kPayloadVelocity  ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
+    kPayloadVelocity, ///< payload 绝对速度模式：直接惩罚吊重水平绝对速度
+    kMinEnergy        ///< 最小能量模式：惩罚摆动能量（势能 + 绝对速度动能）
 }};
 
 struct LqrGain {{
@@ -283,6 +298,11 @@ struct LqrGain {{
     static constexpr double kPayloadVelocityV     = {K_payload[0]:.8f};
     static constexpr double kPayloadVelocityTheta = {K_payload[1]:.8f};
     static constexpr double kPayloadVelocityOmega = {K_payload[2]:.8f};
+
+    // MinEnergy: Q penalizes energy = g*L*theta^2 + (vx + L*omega)^2, R=2
+    static constexpr double kMinEnergyV     = {K_minenergy[0]:.8f};
+    static constexpr double kMinEnergyTheta = {K_minenergy[1]:.8f};
+    static constexpr double kMinEnergyOmega = {K_minenergy[2]:.8f};
 }};
 
 }} // namespace pendulum

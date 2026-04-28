@@ -35,7 +35,7 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
         sys.exit(1)
 
     data = [load_and_label(f, l) for f, l in zip(files, labels)]
-    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red", "VelocityOmega": "purple", "PayloadVelocity": "orange"}
+    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red", "VelocityOmega": "purple", "PayloadVelocity": "orange", "MinEnergy": "brown"}
 
     # 自动检测刹车开始时间（以第一个文件为准）
     t_brake, px_brake = detect_brake_start(data[0])
@@ -135,10 +135,10 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 6:
-        print("Usage: python3 plot_brake_phase.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv> <payload.csv>")
+    if len(sys.argv) < 7:
+        print("Usage: python3 plot_brake_phase.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv> <payload.csv> <minenergy.csv>")
         sys.exit(1)
     plot_brake_phase(
-        [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]],
-        ["Full", "Shortest", "MinSwing", "VelocityOmega", "PayloadVelocity"]
+        [sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]],
+        ["Full", "Shortest", "MinSwing", "VelocityOmega", "PayloadVelocity", "MinEnergy"]
     )
