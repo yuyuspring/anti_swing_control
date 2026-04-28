@@ -18,19 +18,19 @@ enum class LqrMode {
 
 struct LqrGain {
     // Full: Q=[2,30,10], R=2
-    static constexpr double kFullV     = 0.98793039;
-    static constexpr double kFullTheta = -3.33079858;
-    static constexpr double kFullOmega = -3.20965162;
+    static constexpr double kFullV     = 0.49678350;
+    static constexpr double kFullTheta = -1.18520599;
+    static constexpr double kFullOmega = -2.17864616;
 
     // Shortest: Q=[8,2,1], R=3
-    static constexpr double kShortestV     = 1.60599035;
-    static constexpr double kShortestTheta = -0.82512925;
-    static constexpr double kShortestOmega = -0.51700885;
+    static constexpr double kShortestV     = 1.95969827;
+    static constexpr double kShortestTheta = -1.04195007;
+    static constexpr double kShortestOmega = -0.53672254;
 
     // MinSwing: Q=[1,100,50], R=2
-    static constexpr double kMinSwingV     = 0.69883014;
-    static constexpr double kMinSwingTheta = -5.69992072;
-    static constexpr double kMinSwingOmega = -7.02950842;
+    static constexpr double kMinSwingV     = 0.35127495;
+    static constexpr double kMinSwingTheta = -1.94767484;
+    static constexpr double kMinSwingOmega = -4.38599360;
 
     // VelocityOmega: Q=[10,1,100], R=2
     static constexpr double kVelocityOmegaV     = 2.18231813;
@@ -38,19 +38,19 @@ struct LqrGain {
     static constexpr double kVelocityOmegaOmega = -2.93945274;
 
     // PayloadVelocity: Q penalizes (vx + L*omega)^2, R=2
-    static constexpr double kPayloadVelocityV     = 0.98727532;
-    static constexpr double kPayloadVelocityTheta = -12.09964413;
-    static constexpr double kPayloadVelocityOmega = -4.27763263;
+    static constexpr double kPayloadVelocityV     = 0.62638105;
+    static constexpr double kPayloadVelocityTheta = -6.87940752;
+    static constexpr double kPayloadVelocityOmega = -5.01101625;
 
     // MinEnergy: Q penalizes energy = g*L*theta^2 + (vx + L*omega)^2, R=2
-    static constexpr double kMinEnergyV     = 1.55603116;
-    static constexpr double kMinEnergyTheta = -18.89273871;
-    static constexpr double kMinEnergyOmega = -0.47858966;
+    static constexpr double kMinEnergyV     = 1.27251941;
+    static constexpr double kMinEnergyTheta = -15.33355346;
+    static constexpr double kMinEnergyOmega = -2.37810769;
 
     // SystemEnergy: Q penalizes drone KE + pendulum energy, R=2
-    static constexpr double kSystemEnergyV     = 2.18632068;
-    static constexpr double kSystemEnergyTheta = -18.77173039;
-    static constexpr double kSystemEnergyOmega = -0.39319997;
+    static constexpr double kSystemEnergyV     = 1.79072359;
+    static constexpr double kSystemEnergyTheta = -15.30929696;
+    static constexpr double kSystemEnergyOmega = -1.78684522;
 };
 
 } // namespace pendulum

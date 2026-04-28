@@ -96,7 +96,7 @@ Default parameters:
 - Target position: `50 m`
 - Rope length: `15 m`
 - Initial swing angle: `0.1 rad` (~5.7°)
-- Max horizontal acceleration: `±3 m/s²`
+- Max horizontal acceleration: `±2 m/s²`
 - Total duration: `40 s`
 
 ### Custom Parameters
@@ -194,7 +194,7 @@ cd build && make -j4
 | `g` | `9.81 m/s²` | Gravity |
 | `L` | `15 m` | Rope length |
 | `ζ` | `0.06` | Damping ratio |
-| `a_max` | `±3 m/s²` | Drone acceleration limit |
+| `a_max` | `±2 m/s²` | Drone acceleration limit |
 
 ## Coordinate Frames
 

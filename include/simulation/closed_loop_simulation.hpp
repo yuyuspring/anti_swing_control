@@ -24,7 +24,7 @@ struct ClosedLoopConfig {
     double dtTruth = 0.001;          ///< Ground-truth dynamics step [s]
     double dtControl = 0.02;         ///< Control / observer period [s]
     double ropeLength = 15.0;        ///< [m]
-    double axMax = 3.0;              ///< Max horizontal acceleration [m/s^2]
+    double axMax = 2.0;              ///< Max horizontal acceleration [m/s^2]
     double vxMax = 15.0;             ///< Max horizontal velocity [m/s]
     double jerkMax = 2.0;            ///< Max jerk [m/s^3]
     ControlMode mode = ControlMode::kFull; ///< Control strategy

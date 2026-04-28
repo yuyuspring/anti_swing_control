@@ -106,7 +106,7 @@ def plot_brake_phase(files, labels, output_path="brake_phase.png"):
         c = colors.get(df["mode"].iloc[0], "black")
         ax.plot(df["time_rel"], df["ax_applied_m_s2"], color=c, label=df["mode"].iloc[0], linewidth=1.5)
     ax.axhline(3, color="gray", linestyle="--", alpha=0.3)
-    ax.axhline(-3, color="gray", linestyle="--", alpha=0.3)
+    ax.axhline(-2, color="gray", linestyle="--", alpha=0.3)
     ax.axhline(0, color="black", linestyle="-", alpha=0.2)
     ax.set_ylabel("Acceleration [m/s²]")
     ax.set_xlabel("Time since brake start [s]")

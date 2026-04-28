@@ -134,9 +134,9 @@ $$
 
 ---
 
-## 6. 五种控制模式的 Q/R 整定
+## 6. 七种控制模式的 Q/R 整定
 
-通过调整权重矩阵 $Q$ 和 $R$，得到五种不同控制性格的 LQR。
+通过调整权重矩阵 $Q$ 和 $R$，得到七种不同控制性格的 LQR。
 
 ### 6.1 权重配置
 
@@ -147,6 +147,8 @@ $$
 | **MinSwing** | $\text{diag}(1, 100, 50)$ | 2 | **最小摆动**：大幅惩罚摆角与角速度 |
 | **VelocityOmega** | $\text{diag}(10, 1, 100)$ | 2 | **速度+角速度**：同时抑制速度和平抑角速度 |
 | **PayloadVelocity** | 非对角矩阵（见 6.4） | 2 | **Payload 绝对速度**：直接惩罚吊重水平绝对速度 |
+| **MinEnergy** | 非对角矩阵（见 6.5） | 2 | **最小摆动能量**：惩罚势能 + 绝对速度动能 |
+| **SystemEnergy** | 非对角矩阵（见 6.6） | 2 | **系统总能量最低**：无人机动能 + 摆能量 |
 
 ### 6.2 增益结果
 
@@ -156,7 +158,9 @@ $$
 | **Shortest** | `1.605990` | `-0.825129` | `-0.517009` | 0.9997 | ⚠ 收敛极慢 |
 | **MinSwing** | `0.698830` | `-5.699921` | `-7.029508` | 0.9948 | ✓ 稳定 |
 | **VelocityOmega** | `2.182318` | `-5.096300` | `-2.939453` | 0.9984 | ✓ 稳定 |
-| **PayloadVelocity** | `1.392986` | `-16.870620` | `-1.619842` | 0.9925 | ✓ 稳定 |
+| **PayloadVelocity** | `0.987275` | `-12.099644` | `-4.277633` | 0.9934 | ✓ 稳定 |
+| **MinEnergy** | `1.556031` | `-18.892739` | `-0.478590` | 0.9920 | ✓ 稳定 |
+| **SystemEnergy** | `2.186321` | `-18.771730` | `-0.393200` | 0.9937 | ✓ 稳定 |
 
 ### 6.3 物理直觉
 
@@ -180,10 +184,22 @@ $$
 - 刹车距离最短（46.25 m），但摆角抑制不如 MinSwing
 
 #### PayloadVelocity 模式
-- **唯一使用非对角 $Q$ 矩阵的模式**
+- **唯一使用非对角 $Q$ 矩阵的模式（之一）**
 - 惩罚项为 $q_{\text{pay}} \cdot (v_x + L\dot{\theta})^2$，即吊重的水平绝对速度
-- $K_{\theta} = -16.87$ 很大，对摆角极其敏感
+- $K_{\theta} = -12.10$ 很大，对摆角极其敏感
 - 刹车距离 49.70 m，摆角抑制介于 Full 和 MinSwing 之间
+
+#### MinEnergy 模式
+- 惩罚吊重摆动能量：$E \approx 0.5 m g L \theta^2 + 0.5 m (v_x + L\dot{\theta})^2$
+- $K_{\theta} \approx -18.89$ 极大，对摆角极为敏感
+- $K_{\dot{\theta}} \approx -0.48$ 很小，对直接阻尼角速度较弱
+- 通过能量视角间接抑制摆动
+
+#### SystemEnergy 模式
+- 在 MinEnergy 基础上额外惩罚无人机动能 $0.5 M v_x^2$
+- $K_{v_x} \approx 2.19$ 最大，对速度收敛最积极
+- $K_{\theta} \approx -18.77$ 与 MinEnergy 相近
+- 整体兼顾减速与消摆，闭环收敛最快（`max|eig| = 0.9937`）
 
 ### 6.4 PayloadVelocity 的非对角 Q 矩阵
 
@@ -200,17 +216,76 @@ $$
 当前参数（$L = 15\ \text{m}$）：
 
 ```python
-q_pay = 4.0
-q_theta = 1.0
+q_pay = 2.0
+q_theta = 30.0
 q_omega_extra = 1.0
-Q = [[4,    0,   60],
-     [0,    1,    0],
-     [60,   0,  901]]
+Q = [[2,    0,   30],
+     [0,   30,    0],
+     [30,   0,  451]]
 ```
 
 > ⚠ **关键约束**：增大 $q_{\text{pay}}$ 时需警惕 $K_{\dot{\theta}}$ 变正。当 $q_{\text{pay}} \gtrsim 5.5$ 时，$K_{\dot{\theta}}$ 从负变正，会在大角度下引入正反馈，导致非线性发散。
 
-> 代码参考：`scripts/compute_lqr_gain.py` 第 176–200 行；生成的 `include/controller/lqr_gain.hpp`
+### 6.5 MinEnergy 的非对角 Q 矩阵
+
+MinEnergy 模式惩罚吊重摆动能量（势能 + 绝对速度动能）：
+
+$$
+E = \frac{1}{2} m g L \theta^2 + \frac{1}{2} m (v_x + L\dot{\theta})^2
+$$
+
+对应的 $Q$ 矩阵：
+
+$$
+Q = \begin{bmatrix}
+q_{\text{ke}} & 0 & q_{\text{ke}} \cdot L \\
+0 & q_{\text{pe}} & 0 \\
+q_{\text{ke}} \cdot L & 0 & q_{\text{ke}} \cdot L^2 + q_{\omega}
+\end{bmatrix}
+$$
+
+当前参数（$L = 15\ \text{m}$）：
+
+```python
+q_ke = 5.0      # 动能惩罚系数（基于绝对速度）
+q_pe = 1.0      # 势能惩罚系数
+q_omega_extra = 1.0  # 确保正定的微小正则项
+Q = [[5,    0,   75],
+     [0,    1,    0],
+     [75,   0, 1126]]
+```
+
+### 6.6 SystemEnergy 的非对角 Q 矩阵
+
+SystemEnergy 模式在 MinEnergy 基础上额外增加无人机动能惩罚：
+
+$$
+E_{\text{total}} = \frac{1}{2} M v_x^2 + \frac{1}{2} m g L \theta^2 + \frac{1}{2} m (v_x + L\dot{\theta})^2
+$$
+
+对应的 $Q$ 矩阵：
+
+$$
+Q = \begin{bmatrix}
+q_{\text{drone}} + q_{\text{ke}} & 0 & q_{\text{ke}} \cdot L \\
+0 & q_{\text{pe}} & 0 \\
+q_{\text{ke}} \cdot L & 0 & q_{\text{ke}} \cdot L^2 + q_{\omega}
+\end{bmatrix}
+$$
+
+当前参数（$L = 15\ \text{m}$）：
+
+```python
+q_ke = 5.0      # 摆动能惩罚系数
+q_pe = 1.0      # 摆势能惩罚系数
+q_drone = 5.0   # 无人机动能惩罚系数（M=120kg, m=150kg, 比例≈0.8）
+q_omega_extra = 1.0
+Q = [[10,   0,   75],
+     [0,    1,    0],
+     [75,   0, 1126]]
+```
+
+> 代码参考：`scripts/compute_lqr_gain.py` 第 176–230 行；生成的 `include/controller/lqr_gain.hpp`
 
 ---
 
@@ -251,15 +326,50 @@ if max_eig < 1.0:
 ⚠ 收敛极慢
 ```
 
-> 代码参考：`scripts/compute_lqr_gain.py` 第 208–227 行
+> 代码参考：`scripts/compute_lqr_gain.py` 第 232–260 行
 
 ---
 
 ## 8. 在线控制律（C++ 实现）
 
+### 8.0 闭环控制框图
+
+整个 LQR 状态反馈闭环的结构如下：
+
+```mermaid
+flowchart LR
+    r["r = 0<br/>(目标速度)"] --> sum["⊕"]
+    sum --> K["LQR<br/>-K"]
+    K --> sat["sat(·)<br/>±2 m/s²"]
+    sat --> ax["u = ax"]
+    ax --> sys["吊重-无人机系统<br/>ẋ = Ac·x + Bc·u"]
+    sys --> x["x = [vx, θ, ω]ᵀ"]
+    x --> sensor["IMU<br/>传感器"]
+    sensor --> obs["观测器<br/>(ESO+四元数+单摆补偿)"]
+    obs -.->|"x̂"| sum
+
+    style sum fill:#fff2cc,stroke:#d6b656
+    style K fill:#dae8fc,stroke:#6c8ebf
+    style sys fill:#d5e8d4,stroke:#82b366
+    style obs fill:#e1d5e7,stroke:#9673a6
+```
+
+> **注意**：七种控制模式（Full / Shortest / MinSwing / VelocityOmega / PayloadVelocity / MinEnergy / SystemEnergy）共用**同一套闭环框图**，区别仅在于 $K$ 的数值通过查表切换。
+
+**信号说明**：
+
+| 符号 | 含义 | 来源 |
+|------|------|------|
+| $r$ | 参考输入（目标水平速度） | 固定为 0 |
+| $x$ | 真实状态 $[v_x, \theta, \dot{\theta}]^{\top}$ | 被控对象输出 |
+| $\hat{x}$ | 观测器估计状态 | IMU → ESO + 四元数姿态估计 + 单摆动力学补偿 |
+| $-K$ | LQR 最优反馈增益 | 离线求解 DARE 得 |
+| $\text{sat}(\cdot)$ | 加速度饱和限幅 | $[-2, +2]\ \text{m/s}^2$ |
+| $u$ | 控制输入（无人机水平加速度 $a_x$） | 控制器输出 |
+
 ### 8.1 增益查表
 
-五种增益在编译期硬编码于 `lqr_gain.hpp`：
+七种增益在编译期硬编码于 `lqr_gain.hpp`：
 
 ```cpp
 struct LqrGain {
@@ -284,9 +394,19 @@ struct LqrGain {
     static constexpr double kVelocityOmegaOmega = -2.93945274;
 
     // PayloadVelocity: Q penalizes (vx + L*omega)^2, R=2
-    static constexpr double kPayloadVelocityV     = 1.39298637;
-    static constexpr double kPayloadVelocityTheta = -16.87062001;
-    static constexpr double kPayloadVelocityOmega = -1.61984222;
+    static constexpr double kPayloadVelocityV     = 0.98727532;
+    static constexpr double kPayloadVelocityTheta = -12.09964413;
+    static constexpr double kPayloadVelocityOmega = -4.27763263;
+
+    // MinEnergy: Q penalizes energy = g*L*theta^2 + (vx + L*omega)^2, R=2
+    static constexpr double kMinEnergyV     = 1.55603116;
+    static constexpr double kMinEnergyTheta = -18.89273871;
+    static constexpr double kMinEnergyOmega = -0.47858966;
+
+    // SystemEnergy: Q penalizes drone KE + pendulum energy, R=2
+    static constexpr double kSystemEnergyV     = 2.18632068;
+    static constexpr double kSystemEnergyTheta = -18.77173039;
+    static constexpr double kSystemEnergyOmega = -0.39319997;
 };
 ```
 
@@ -297,7 +417,7 @@ double LqrController::computeControl(const State& state) const {
     double u = -(kV_ * state.vx +
                  kTheta_ * state.theta +
                  kOmega_ * state.omega);
-    return saturate(u, axLimit_);  // 限制在 [-3, +3] m/s²
+    return saturate(u, axLimit_);  // 限制在 [-2, +2] m/s²
 }
 ```
 
@@ -312,24 +432,18 @@ double LqrController::computeControl(const State& state) const {
 
 ## 9. 设计流程图
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────┐
-│  连续模型 Ac,Bc  │ ──→ │ ZOH 离散化    │ ──→ │ 求解 DARE   │
-│  (小角度线性化)  │     │ Ts = 0.02 s  │     │ 得 K        │
-└─────────────────┘     └──────────────┘     └─────────────┘
-                                                    │
-                       ┌────────────────────────────┘
-                       ▼
-              ┌─────────────────┐
-              │  lqr_gain.hpp   │  ← 硬编码五种 K（编译期嵌入）
-              └─────────────────┘
-                       │
-         ┌─────────────┼─────────────┬─────────────┬─────────────┐
-         ▼             ▼             ▼             ▼             ▼
-    ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
-    │  Full   │  │ Shortest│  │ MinSwing│  │VelOmega │  │ PayLoad │
-    │ K=[...] │  │ K=[...] │  │ K=[...] │  │ K=[...] │  │ K=[...] │
-    └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘
+```mermaid
+flowchart LR
+    A["连续模型 Ac,Bc<br/>(小角度线性化)"] --> B["ZOH 离散化<br/>Ts = 0.02 s"]
+    B --> C["求解 DARE<br/>得 K"]
+    C --> D["lqr_gain.hpp<br/>硬编码七种 K"]
+    D --> E1["Full"]
+    D --> E2["Shortest"]
+    D --> E3["MinSwing"]
+    D --> E4["VelocityOmega"]
+    D --> E5["PayloadVelocity"]
+    D --> E6["MinEnergy"]
+    D --> E7["SystemEnergy"]
 ```
 
 ---
@@ -343,7 +457,7 @@ double LqrController::computeControl(const State& state) const {
 | **无积分项** | 纯状态反馈，对稳态误差（如传感器 bias、风扰）无消除能力 | 加入积分状态 $\int v_x \, dt$ |
 | **无位置控制** | 3 状态 LQR 只把速度控到 0，不控制最终停靠位置 | 扩展为 4 状态 $[p, v, \theta, \dot{\theta}]^{\top}$ |
 | **Q/R 凭经验** | 权重靠手动试凑，未做系统性优化 | 可用遗传算法或基于仿真数据的自动调参 |
-| **非对角 Q 的物理风险** | PayloadVelocity 使用非对角 $Q$，参数空间存在 $K_{\dot{\theta}} > 0$ 的危险区域 | 脚本已增加符号检查，可进一步做非线性仿真预验证 |
+| **非对角 Q 的物理风险** | PayloadVelocity、MinEnergy、SystemEnergy 使用非对角 $Q$，参数空间存在 $K_{\dot{\theta}} > 0$ 的危险区域 | 脚本已增加符号检查，可进一步做非线性仿真预验证 |
 
 ---
 
@@ -352,6 +466,8 @@ double LqrController::computeControl(const State& state) const {
 | 文件 | 作用 |
 |------|------|
 | `scripts/compute_lqr_gain.py` | Python 离线设计脚本：建模型 → 离散化 → 解 DARE → 工程稳定性检查 → 生成 C++ 头文件 |
-| `include/controller/lqr_gain.hpp` | 自动生成的增益头文件（硬编码五种模式的 K） |
+| `include/controller/lqr_gain.hpp` | 自动生成的增益头文件（硬编码七种模式的 K） |
 | `include/controller/lqr_controller.hpp` | C++ LQR 控制器类接口定义 |
 | `src/controller/lqr_controller.cpp` | 在线控制律实现（查表 + 状态反馈 + 饱和） |
+| `include/simulation/closed_loop_simulation.hpp` | 闭环仿真配置与 `ControlMode` 枚举定义 |
+| `src/apps/run_closed_loop_lqr.cpp` | 闭环 LQR 仿真可执行程序入口 |

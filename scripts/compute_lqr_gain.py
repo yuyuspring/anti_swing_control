@@ -174,21 +174,24 @@ def generate_lqr_gains(
     # Step 2: ZOH 离散化
     Ad, Bd = c2d(A, B, dt_control)
 
-    # Step 3: 求解四种模式的 LQR 增益
+    # Step 3: 求解七种模式的 LQR 增益
+    # 设计原则（axMax = 2.0 m/s²）：
+    #   通过差异化 R 把 K_vx 拉开梯度，让各模式在饱和/非饱和阶段体现出不同性格。
+    #   退出饱和速度 ≈ 2.0 / K_vx
+
     # Mode 1: Full - 均衡策略
-    K_full = solve_lqr(Ad, Bd, [2.0, 30.0, 10.0], 2.0)
+    K_full = solve_lqr(Ad, Bd, [2.0, 30.0, 10.0], 8.0)
 
     # Mode 2: Shortest - 优先速度收敛（最短刹车距离）
-    K_shortest = solve_lqr(Ad, Bd, [8.0, 2.0, 1.0], 3.0)
+    K_shortest = solve_lqr(Ad, Bd, [8.0, 2.0, 1.0], 2.0)
 
     # Mode 3: MinSwing - 优先摆动抑制（温柔刹车）
-    K_minswing = solve_lqr(Ad, Bd, [1.0, 100.0, 50.0], 2.0)
+    K_minswing = solve_lqr(Ad, Bd, [1.0, 100.0, 50.0], 8.0)
 
     # Mode 4: VelocityOmega - 同时抑制速度和角速度
     K_velomega = solve_lqr(Ad, Bd, [10.0, 1.0, 100.0], 2.0)
 
     # Mode 5: PayloadVelocity - 惩罚 payload 绝对水平速度 (vx + L*omega)
-    # 代价函数中增加 q_pay * (vx + L*omega)^2 项
     q_pay = 2.0
     q_theta = 30.0
     q_omega_extra = 1.0
@@ -197,34 +200,30 @@ def generate_lqr_gains(
         [0.0, q_theta, 0.0],
         [q_pay * rope_length, 0.0, q_pay * rope_length**2 + q_omega_extra]
     ], dtype=float)
-    K_payload = solve_lqr(Ad, Bd, Q_payload, 2.0)
+    K_payload = solve_lqr(Ad, Bd, Q_payload, 5.0)
 
     # Mode 6: MinEnergy - 最小化摆动能量（势能 + 绝对速度动能）
-    # 能量 E ≈ 0.5*m*g*L*theta^2 + 0.5*m*(vx + L*omega)^2
-    # Q 矩阵同时惩罚 theta^2 和 (vx + L*omega)^2
-    q_ke = 5.0    # 动能惩罚系数（基于绝对速度）
-    q_pe = 1.0   # 势能惩罚系数
-    q_omega_extra_energy = 1.0  # 确保正定的微小正则项
+    q_ke = 5.0
+    q_pe = 1.0
+    q_omega_extra_energy = 1.0
     Q_minenergy = np.array([
         [q_ke, 0.0, q_ke * rope_length],
         [0.0, q_pe, 0.0],
         [q_ke * rope_length, 0.0, q_ke * rope_length**2 + q_omega_extra_energy]
     ], dtype=float)
-    K_minenergy = solve_lqr(Ad, Bd, Q_minenergy, 2.0)
+    K_minenergy = solve_lqr(Ad, Bd, Q_minenergy, 3.0)
 
     # Mode 7: SystemEnergy - 最小化系统总能量（无人机动能 + 摆势能 + 摆动能）
-    # E_total = 0.5*M*vx^2 + 0.5*m*g*L*theta^2 + 0.5*m*(vx + L*omega)^2
-    # 在 MinEnergy 基础上额外增加无人机动能惩罚 q_drone * vx^2
-    q_ke_sys = 5.0     # 摆动能惩罚系数（与 MinEnergy 相同）
-    q_pe_sys = 1.0     # 摆势能惩罚系数（与 MinEnergy 相同）
-    q_drone = 5.0      # 无人机动能惩罚系数（M=120kg, m=150kg, 比例≈0.8）
+    q_ke_sys = 5.0
+    q_pe_sys = 1.0
+    q_drone = 5.0
     q_omega_extra_sys = 1.0
     Q_systemenergy = np.array([
         [q_drone + q_ke_sys, 0.0, q_ke_sys * rope_length],
         [0.0, q_pe_sys, 0.0],
         [q_ke_sys * rope_length, 0.0, q_ke_sys * rope_length**2 + q_omega_extra_sys]
     ], dtype=float)
-    K_systemenergy = solve_lqr(Ad, Bd, Q_systemenergy, 2.0)
+    K_systemenergy = solve_lqr(Ad, Bd, Q_systemenergy, 3.0)
 
     # Step 4: 打印闭环极点，验证稳定性
     print("=" * 60)
