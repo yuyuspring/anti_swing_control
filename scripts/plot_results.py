@@ -16,8 +16,8 @@ def load_csv(path):
 
 
 def main():
-    csv_path = sys.argv[1] if len(sys.argv) > 1 else "simulation_results_roll.csv"#simulation_results
-    output_path = sys.argv[2] if len(sys.argv) > 2 else "simulation_results.png"
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "results/simulation_results_roll.csv"  # simulation_results
+    output_path = sys.argv[2] if len(sys.argv) > 2 else "results/simulation_results.png"
     data = load_csv(csv_path)
 
     time = data["t"]

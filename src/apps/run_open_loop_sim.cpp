@@ -28,10 +28,10 @@ constexpr float kImuDistanceFromPivot = 0.1f;
 constexpr float kPlatformMass = 120.0f;
 constexpr float kPayloadMass = 150.0f;
 constexpr float kDampingRatio = 0.06f;
-constexpr char kCsvPath[] = "simulation_results.csv";
-constexpr char kPitchCsvPath[] = "simulation_results_pitch.csv";
-constexpr char kRollCsvPath[] = "simulation_results_roll.csv";
-constexpr char kMixedCsvPath[] = "simulation_results_mixed.csv";
+constexpr char kCsvPath[] = "results/simulation_results.csv";
+constexpr char kPitchCsvPath[] = "results/simulation_results_pitch.csv";
+constexpr char kRollCsvPath[] = "results/simulation_results_roll.csv";
+constexpr char kMixedCsvPath[] = "results/simulation_results_mixed.csv";
 
 struct AxisState {
     float angle;

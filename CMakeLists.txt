@@ -41,6 +41,16 @@ target_link_libraries(run_open_loop_sim PRIVATE pendulum m)
 add_executable(run_csv_replay src/apps/run_csv_replay.cpp)
 target_link_libraries(run_csv_replay PRIVATE pendulum m)
 
+# Create symlinks in build directory so executables can find data/ and results/
+# regardless of whether they are run from project root or build directory.
+add_custom_command(TARGET run_open_loop_sim POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_SOURCE_DIR}/data ${CMAKE_BINARY_DIR}/data
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_SOURCE_DIR}/results ${CMAKE_BINARY_DIR}/results
+    COMMENT "Linking data/ and results/ into build/"
+)
+
 # New closed-loop LQR simulation
 add_executable(run_closed_loop_lqr src/apps/run_closed_loop_lqr.cpp)
 target_link_libraries(run_closed_loop_lqr PRIVATE pendulum)

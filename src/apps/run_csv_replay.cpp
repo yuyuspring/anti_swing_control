@@ -225,8 +225,8 @@ void write_overwrite_csv(const CsvData& data, const std::string& path, std::size
 }  // namespace
 
 int main(int argc, char** argv) {
-    const std::string input_path = (argc > 1) ? argv[1] : "crane_imu_obs_debug.csv";
-    const std::string output_path = (argc > 2) ? argv[2] : "replay_validation.csv";
+    const std::string input_path = (argc > 1) ? argv[1] : "data/crane_imu_obs_debug.csv";
+    const std::string output_path = (argc > 2) ? argv[2] : "results/replay_validation.csv";
     const bool do_overwrite = (argc > 3);
     const std::string overwrite_path = do_overwrite ? argv[3] : "";
 

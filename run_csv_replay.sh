@@ -7,9 +7,9 @@
 
 set -e
 
-INPUT_CSV="${1:-crane_imu_obs_debug.csv}"
-VALIDATION_CSV="replay_validation.csv"
-PLOT_PNG="replay_validation.png"
+INPUT_CSV="${1:-data/crane_imu_obs_debug.csv}"
+VALIDATION_CSV="results/replay_validation.csv"
+PLOT_PNG="results/replay_validation.png"
 
 echo "========================================"
 echo "Step 1: Build"

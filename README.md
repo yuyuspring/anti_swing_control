@@ -6,6 +6,9 @@ Modular C++ project for pendulum angle observation and LQR-based anti-swing cont
 
 ```
 ├── CMakeLists.txt
+├── README.md
+├── run.sh              # One-click closed-loop LQR pipeline
+├── run_csv_replay.sh   # One-click CSV replay validation
 ├── include/            # Public headers
 │   ├── observer/       # Pendulum observer (legacy C core + C++ wrapper)
 │   ├── controller/     # LQR controller
@@ -22,6 +25,8 @@ Modular C++ project for pendulum angle observation and LQR-based anti-swing cont
 │   ├── simulation/
 │   └── utils/
 ├── scripts/            # Python scripts (LQR gain design, plotting)
+├── data/               # Input CSV data (crane IMU recordings)
+├── results/            # Output CSV / plots / animations (gitignored)
 ├── docs/               # Documentation
 └── build/              # CMake build directory (gitignored)
 ```
@@ -65,11 +70,11 @@ Outputs (in `build/`):
 Replays recorded IMU data through the observer and validates against recorded outputs.
 
 ```bash
-./run_csv_replay.sh                    # Default input: crane_imu_obs_debug.csv
+./run_csv_replay.sh                    # Default input: data/crane_imu_obs_debug.csv
 ./run_csv_replay.sh my_data.csv        # Specify custom input
 ```
 
-Outputs:
+Outputs (in `results/`):
 - `replay_validation.csv` — Recorded vs replay comparison data
 - `replay_validation.png` — 4-subplot validation visualization
 
@@ -124,7 +129,7 @@ cd build
 ./run_open_loop_sim
 ```
 
-Generates:
+Generates (in `results/`):
 - `simulation_results.csv`        (pure pitch)
 - `simulation_results_roll.csv`   (pure roll)
 - `simulation_results_mixed.csv`  (mixed pitch + roll)
@@ -132,7 +137,7 @@ Generates:
 ### Plot Results
 
 ```bash
-python3 ../scripts/plot_results.py simulation_results.csv simulation_results.png
+python3 ../scripts/plot_results.py results/simulation_results.csv results/simulation_results.png
 ```
 
 The plot window will stay open. **Close it manually when you are done.**
@@ -147,16 +152,16 @@ Replays recorded flight/crane IMU data through the observer and validates agains
 
 ```bash
 cd build
-./run_csv_replay ../crane_imu_obs_debug.csv
+./run_csv_replay ../data/crane_imu_obs_debug.csv
 ```
 
-Generates:
+Generates (in `results/`):
 - `replay_validation.csv`
 
 ### Plot Results
 
 ```bash
-python3 ../scripts/plot_replay_results.py replay_validation.csv replay_validation.png
+python3 ../scripts/plot_replay_results.py results/replay_validation.csv results/replay_validation.png
 ```
 
 The plot window will stay open. **Close it manually when you are done.**

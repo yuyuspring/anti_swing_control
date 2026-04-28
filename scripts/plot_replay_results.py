@@ -26,8 +26,8 @@ def rms(values):
 
 
 def main():
-    csv_path = sys.argv[1] if len(sys.argv) > 1 else "replay_validation.csv"
-    output_path = sys.argv[2] if len(sys.argv) > 2 else "replay_validation.png"
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "results/replay_validation.csv"
+    output_path = sys.argv[2] if len(sys.argv) > 2 else "results/replay_validation.png"
     data = load_csv(csv_path)
 
     time_s = data["time_s"]

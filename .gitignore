@@ -1,17 +1,15 @@
 # Build artifacts
 *.o
 *.out
-pend_observer_test
-replay_csv
 build/
 
 # Generated data files (large CSVs)
-*.csv
-
-# Generated plots
-*.png
-*.jpg
-*.pdf
+data/*.csv
+results/*.csv
+results/*.png
+results/*.jpg
+results/*.pdf
+results/*.mp4
 
 # Python virtual environment
 .venv/
