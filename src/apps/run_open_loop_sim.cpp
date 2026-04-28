@@ -410,7 +410,6 @@ ScenarioResult run_scenario(const ScenarioConfig &scenario)
         initial_sample.acc_meas_frd[2],
     };
 
-    init_w_lpf_fob(w_meas_init);
     pend_observer_init(acc_init, w_lpf, w_meas_init, &obs);
     for (int axis = 0; axis < 3; ++axis) {
         obs.v_hat[axis] = initial_sample.velocity_meas_neu[axis];

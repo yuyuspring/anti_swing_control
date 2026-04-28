@@ -191,7 +191,7 @@ def generate_lqr_gains(
     # 代价函数中增加 q_pay * (vx + L*omega)^2 项
     q_pay = 4.0
     q_theta = 1.0
-    q_omega_extra = 0.1
+    q_omega_extra = 1.0
     Q_payload = np.array([
         [q_pay, 0.0, q_pay * rope_length],
         [0.0, q_theta, 0.0],
@@ -212,13 +212,23 @@ def generate_lqr_gains(
         eigs = np.linalg.eigvals(Acl)
         max_eig = max(abs(eigs))
 
+        # 工程稳定性评估
+        warnings = []
+        if max_eig >= 1.0:
+            warnings.append("线性不稳定")
+        elif max_eig > 0.999:
+            warnings.append(f"收敛极慢")
+        # K_omega > 0 会在大角度下引入正反馈，导致非线性发散
+        if K[2] > 0:
+            warnings.append("K_omega>0，大角度可能发散")
+
         print(f"\n{name}:")
         print(f"  增益 K = [{K[0]:.6f}, {K[1]:.6f}, {K[2]:.6f}]")
         print(f"  闭环最大特征值 = {max_eig:.4f}", end="")
-        if max_eig < 1.0:
+        if len(warnings) == 0:
             print("  ✓ 稳定")
         else:
-            print("  ✗ 不稳定或临界稳定")
+            print(f"  ⚠ {'; '.join(warnings)}")
 
     print("=" * 60)
 

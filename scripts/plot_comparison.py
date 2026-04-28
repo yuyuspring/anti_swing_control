@@ -2,6 +2,7 @@
 """Compare five control modes: Full, Shortest, MinSwing, VelocityOmega, PayloadVelocity."""
 
 import sys
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -67,20 +68,20 @@ def plot_comparison(files, labels, output_path="comparison.png"):
     ax.grid(True, alpha=0.3)
     ax.set_title("Horizontal Velocity")
 
-    # 3. Swing Velocity (L * omega)
+    # 3. Payload Absolute Horizontal Velocity
     ax = axes[2]
     for df in data:
         c = colors.get(df["mode"].iloc[0], "black")
-        # Compute swing tangential velocity: v_swing = L * omega
-        rope_len = 15.0  # default rope length; could be parameterized
-        v_swing = df["theta_dot_truth_rad_s"] * rope_len
-        ax.plot(df["time_s"], v_swing, color=c, label=df["mode"].iloc[0], linewidth=1.5)
+        # v_payload_x = vx + L * omega * cos(theta)
+        rope_len = 15.0
+        v_abs = df["vx_truth_m_s"] + df["theta_dot_truth_rad_s"] * rope_len * np.cos(df["theta_truth_rad"])
+        ax.plot(df["time_s"], v_abs, color=c, label=df["mode"].iloc[0], linewidth=1.5)
     ax.axhline(0, color="black", linestyle="-", alpha=0.2)
     ax.axvline(t_brake, color="black", linestyle="--", alpha=0.4)
-    ax.set_ylabel("Swing Velocity [m/s]")
+    ax.set_ylabel("Abs Velocity [m/s]")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
-    ax.set_title("Payload Swing Velocity (L·ω)")
+    ax.set_title("Payload Absolute Horizontal Velocity")
 
     # 4. Pendulum angle
     ax = axes[3]

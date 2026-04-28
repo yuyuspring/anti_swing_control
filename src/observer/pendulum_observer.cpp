@@ -25,7 +25,6 @@ void PendulumObserver::initialize(const Input& input) {
         static_cast<float>(rad2deg(input.gyroRadS.z))
     };
 
-    init_w_lpf_fob(wMeas);
     pend_observer_init(acc, wLpf_, wMeas, &obs_);
 }
 

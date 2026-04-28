@@ -28,9 +28,17 @@
 #define ESO_K2      (3.0f * ESO_OMEGA_O * ESO_OMEGA_O)
 #define ESO_K3      (ESO_OMEGA_O * ESO_OMEGA_O * ESO_OMEGA_O)
 
-static float debug_data[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+extern float debug_data[4];
 
-static float obs_data[50] = {0.0f};
+extern float obs_data[50];
+
+struct FOB_t
+{
+    float den[2]; ///< denominator gains
+    float num[2]; ///< numerator gains
+    float input[1]; ///< input history
+    float output[1]; ///< output history
+};
 
 // 观测器状态数据结构
 typedef struct {
@@ -47,22 +55,14 @@ typedef struct {
     float e1[3];       // 加速度叉乘误差项
     float pend[3];     // 单摆角速度增量项
 
-
     // ESO观测器状态
     float v_hat[3];    // 观测速度 (m/s)
     float a_hat[3];    // 观测加速度 (m/s^2)
     float d_hat[3];    // 观测扰动
+
+    // 低通滤波器状态（每个实例独立）
+    FOB_t w_lpf_fob[3];
 } PendObserver;
-
-struct FOB_t
-{
-    float den[2]; ///< denominator gains
-    float num[2]; ///< numerator gains
-    float input[1]; ///< input history
-    float output[1]; ///< output history
-};
-
-void init_w_lpf_fob(const float w_meas[3]);
 
 // 初始化函数
 void pend_observer_init(const float acc[3], float *w_lpf, const float w_meas[3], PendObserver *obs);

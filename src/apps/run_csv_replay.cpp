@@ -22,6 +22,8 @@ struct CsvData {
     std::vector<std::string> header;
     std::unordered_map<std::string, std::size_t> index;
     std::vector<std::vector<double>> rows;
+    // Raw string tokens for each row (used for overwrite output)
+    std::vector<std::vector<std::string>> raw_tokens;
 };
 
 struct Stats {
@@ -99,6 +101,7 @@ CsvData load_csv(const std::string& path) {
             row.push_back(to_double(token));
         }
         data.rows.push_back(std::move(row));
+        data.raw_tokens.push_back(tokens);
     }
 
     return data;
@@ -144,14 +147,90 @@ double synthesize_forward(double north, double east, double yaw_rad) {
     return std::cos(yaw_rad) * north + std::sin(yaw_rad) * east;
 }
 
+// Overwrite observer-estimated columns in raw_tokens with replay values.
+void overwrite_observer_columns(CsvData& data, std::size_t row_index, const PendObserver& obs) {
+    auto& tokens = data.raw_tokens[row_index];
+    auto set_col = [&](const char* key, double value) {
+        auto it = data.index.find(key);
+        if (it != data.index.end()) {
+            std::ostringstream oss;
+            oss << std::setprecision(9) << std::fixed << value;
+            tokens[it->second] = oss.str();
+        }
+    };
+
+    // theta (yaw, pitch, roll)
+    set_col("theta[0]", obs.theta[0]);
+    set_col("theta[1]", obs.theta[1]);
+    set_col("theta[2]", obs.theta[2]);
+
+    // w_est (roll_rate, pitch_rate, yaw_rate) in rad/s
+    set_col("w_est[0]", obs.w_est[0]);
+    set_col("w_est[1]", obs.w_est[1]);
+    set_col("w_est[2]", obs.w_est[2]);
+
+    // v_hat (north, east, down)
+    set_col("v_hat[0]", obs.v_hat[0]);
+    set_col("v_hat[1]", obs.v_hat[1]);
+    set_col("v_hat[2]", obs.v_hat[2]);
+
+    // a_hat (north, east, down)
+    set_col("a_hat[0]", obs.a_hat[0]);
+    set_col("a_hat[1]", obs.a_hat[1]);
+    set_col("a_hat[2]", obs.a_hat[2]);
+
+    // acc_modify from debug_data
+    set_col("acc_modify[0]", debug_data[1]);
+    set_col("acc_modify[1]", debug_data[2]);
+    set_col("acc_modify[2]", debug_data[3]);
+
+    // Rg
+    set_col("Rg[0]", obs.Rg[0]);
+    set_col("Rg[1]", obs.Rg[1]);
+    set_col("Rg[2]", obs.Rg[2]);
+}
+
+void write_overwrite_csv(const CsvData& data, const std::string& path, std::size_t first_valid_index) {
+    std::ofstream file(path);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open overwrite output CSV: " + path);
+    }
+
+    // Header
+    for (std::size_t i = 0; i < data.header.size(); ++i) {
+        if (i > 0) file << ',';
+        file << data.header[i];
+    }
+    file << '\n';
+
+    // Rows before first_valid_index: keep original
+    for (std::size_t r = 0; r < first_valid_index; ++r) {
+        for (std::size_t c = 0; c < data.raw_tokens[r].size(); ++c) {
+            if (c > 0) file << ',';
+            file << data.raw_tokens[r][c];
+        }
+        file << '\n';
+    }
+
+    // Rows from first_valid_index onward: overwritten
+    for (std::size_t r = first_valid_index; r < data.raw_tokens.size(); ++r) {
+        for (std::size_t c = 0; c < data.raw_tokens[r].size(); ++c) {
+            if (c > 0) file << ',';
+            file << data.raw_tokens[r][c];
+        }
+        file << '\n';
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
     const std::string input_path = (argc > 1) ? argv[1] : "crane_imu_obs_debug.csv";
     const std::string output_path = (argc > 2) ? argv[2] : "replay_validation.csv";
+    const std::string overwrite_path = (argc > 3) ? argv[3] : "crane_imu_obs_debug_1.csv";
 
     try {
-        const CsvData data = load_csv(input_path);
+        CsvData data = load_csv(input_path);
         const std::size_t first_valid_index = find_first_valid_row(data);
         const double start_time = get_value(data, data.rows[first_valid_index], "time_stamp");
 
@@ -163,7 +242,6 @@ int main(int argc, char** argv) {
         fill_vec3(data, data.rows[first_valid_index], "w_meas[0]", "w_meas[1]", "w_meas[2]", w_meas_init);
         fill_vec3(data, data.rows[first_valid_index], "a_meas[0]", "a_meas[1]", "a_meas[2]", a_meas_init);
 
-        init_w_lpf_fob(w_meas_init);
         pend_observer_init(a_meas_init, w_lpf, w_meas_init, &obs);
 
         std::ofstream output(output_path);
@@ -222,6 +300,9 @@ int main(int argc, char** argv) {
             };
 
             pend_observer_iterate_2(&obs, w_lpf, w_meas, a_meas, v_meas, ahrs_input, static_cast<float>(kReplayRopeLength));
+
+            // Overwrite observer columns in raw tokens for this row
+            overwrite_observer_columns(data, row_index, obs);
 
             const double time_s = relative_time(data, row, start_time);
             const double recorded_pitch = get_value(data, row, "theta[1]");
@@ -305,6 +386,9 @@ int main(int argc, char** argv) {
                    << obs.Rg[2] - recorded_rg_z << '\n';
         }
 
+        // Write overwritten CSV with same format as input
+        write_overwrite_csv(data, overwrite_path, first_valid_index);
+
         std::cout << std::fixed << std::setprecision(6);
         std::cout << "replay rows: " << pitch_stats.count << "\n";
         std::cout << "first valid csv line: " << (first_valid_index + 2) << "\n";
@@ -323,6 +407,7 @@ int main(int argc, char** argv) {
                   << rg_y_stats.rmse() << ", "
                   << rg_z_stats.rmse() << "\n";
         std::cout << "saved replay validation csv to " << output_path << "\n";
+        std::cout << "saved overwrite csv to " << overwrite_path << "\n";
 
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

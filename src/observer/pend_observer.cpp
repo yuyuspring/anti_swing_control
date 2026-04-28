@@ -1,4 +1,19 @@
 #include "observer/pend_observer.h"
+#include <cmath>
+#include <cstdio>
+
+static bool has_invalid_data(const float *data, int len)
+{
+    for (int i = 0; i < len; ++i) {
+        if (std::isnan(data[i]) || std::isinf(data[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+float debug_data[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+float obs_data[50] = {0.0f};
 
 typedef struct
 {
@@ -17,21 +32,12 @@ typedef struct
 
 void get_acc_tbfn(const float* euler_rad, const float* acc_n, float *acc_b);
 
-static struct FOB_t w_lpf_fob[3];
 static float ring_buffer_yaw[10] = {0};
 static float ring_buffer_pitch[10] = {0};
 static float ring_buffer_roll[10] = {0};
 
 static int16_t index_obsv_theta = 0;
 const int16_t size_ring_buffer = 10;
-
-void init_w_lpf_fob(const float w_meas[3])
-{
-    for(int i=0;i<3;i++)
-    {
-        InitFOBF(&w_lpf_fob[i],0.3f,50.0f,w_meas[i]/R2D);
-    }
-}
 
 // 初始化观测器状态
 void pend_observer_init(const float acc[3], float *w_lpf, const float w_meas[3], PendObserver *obs)
@@ -44,9 +50,13 @@ void pend_observer_init(const float acc[3], float *w_lpf, const float w_meas[3],
     obs->w_meas[1] = w_meas[1]/R2D;
     obs->w_meas[2] = w_meas[2]/R2D;
 
-    w_lpf[0] = UpdateFOBF(&w_lpf_fob[0],obs->w_meas[0]);
-    w_lpf[1] = UpdateFOBF(&w_lpf_fob[1],obs->w_meas[1]);
-    w_lpf[2] = UpdateFOBF(&w_lpf_fob[2],obs->w_meas[2]);
+    for (int i = 0; i < 3; i++) {
+        InitFOBF(&obs->w_lpf_fob[i], 0.3f, 50.0f, obs->w_meas[i]);
+    }
+
+    w_lpf[0] = UpdateFOBF(&obs->w_lpf_fob[0],obs->w_meas[0]);
+    w_lpf[1] = UpdateFOBF(&obs->w_lpf_fob[1],obs->w_meas[1]);
+    w_lpf[2] = UpdateFOBF(&obs->w_lpf_fob[2],obs->w_meas[2]);
 
     // 计算重力模长（理论值≈9.81m/s²，用于验证数据有效性）
     float gravity_sq = acc[0]*acc[0] + acc[1]*acc[1] + acc[2]*acc[2];
@@ -54,7 +64,7 @@ void pend_observer_init(const float acc[3], float *w_lpf, const float w_meas[3],
     // 异常值判断（模长过小时直接返回错误）
     if (gravity < 1.0f || gravity > 20.0f) 
     {
-        // 正常重力范围1~20m/s²
+        printf("pend_observer_init failed: invalid gravity magnitude %f\n", gravity);
         return;
     }
     // 计算俯仰角 (Pitch)：绕Y轴旋转
@@ -96,15 +106,21 @@ void pend_observer_init(const float acc[3], float *w_lpf, const float w_meas[3],
 
 // 观测器单次迭代（核心逻辑）
 void pend_observer_iterate(PendObserver *obs, float *w_lpf, float *w_meas, float *a_meas,float length_rope) {
+    if (length_rope < 1e-3f) {
+        return;
+    }
+    if (has_invalid_data(w_meas, 3) || has_invalid_data(a_meas, 3)) {
+        return;
+    }
     memcpy(obs->a_meas, a_meas, 3*sizeof(float));
 
     obs->w_meas[0] = w_meas[0]/R2D;
     obs->w_meas[1] = w_meas[1]/R2D;
     obs->w_meas[2] = w_meas[2]/R2D;
 
-    w_lpf[0] = UpdateFOBF(&w_lpf_fob[0],obs->w_meas[0]);
-    w_lpf[1] = UpdateFOBF(&w_lpf_fob[1],obs->w_meas[1]);
-    w_lpf[2] = UpdateFOBF(&w_lpf_fob[2],obs->w_meas[2]);
+    w_lpf[0] = UpdateFOBF(&obs->w_lpf_fob[0],obs->w_meas[0]);
+    w_lpf[1] = UpdateFOBF(&obs->w_lpf_fob[1],obs->w_meas[1]);
+    w_lpf[2] = UpdateFOBF(&obs->w_lpf_fob[2],obs->w_meas[2]);
 
     // ---------------------- 预测部分 ----------------------
     // obs->pend 滚转 俯仰 偏航
@@ -133,6 +149,9 @@ void pend_observer_iterate(PendObserver *obs, float *w_lpf, float *w_meas, float
     }
     float q_norm = sqrt(q_temp[0]*q_temp[0] + q_temp[1]*q_temp[1] + 
                         q_temp[2]*q_temp[2] + q_temp[3]*q_temp[3]);
+    if (q_norm < 1e-6f) {
+        return;
+    }
     for (int i = 0; i < 4; i++) {
         obs->q[i] = q_temp[i] / q_norm;
     }    
@@ -173,6 +192,12 @@ void pend_observer_iterate(PendObserver *obs, float *w_lpf, float *w_meas, float
 
 void pend_observer_iterate_2(PendObserver *obs, float *w_lpf, float *w_meas, float *a_meas, float *v_meas,const float *ahrs_input, float length_rope) 
 {
+    if (length_rope < 1e-3f) {
+        return;
+    }
+    if (has_invalid_data(w_meas, 3) || has_invalid_data(a_meas, 3)) {
+        return;
+    }
     memcpy(obs->a_meas, a_meas, 3*sizeof(float));
 
     obs->w_meas[0] = w_meas[0]/R2D;
@@ -183,9 +208,9 @@ void pend_observer_iterate_2(PendObserver *obs, float *w_lpf, float *w_meas, flo
     obs_data[1] = obs->w_meas[1];
     obs_data[2] = obs->w_meas[2];
 
-    w_lpf[0] = UpdateFOBF(&w_lpf_fob[0],obs->w_meas[0]);
-    w_lpf[1] = UpdateFOBF(&w_lpf_fob[1],obs->w_meas[1]);
-    w_lpf[2] = UpdateFOBF(&w_lpf_fob[2],obs->w_meas[2]);
+    w_lpf[0] = UpdateFOBF(&obs->w_lpf_fob[0],obs->w_meas[0]);
+    w_lpf[1] = UpdateFOBF(&obs->w_lpf_fob[1],obs->w_meas[1]);
+    w_lpf[2] = UpdateFOBF(&obs->w_lpf_fob[2],obs->w_meas[2]);
 
     float ahrs_fus[3] = {0.0f, 0.0f, 0.0f};
     ahrs_fus[0] = ahrs_input[0] / R2D; // 偏航角测量值（rad）

@@ -36,9 +36,9 @@ struct LqrGain {
     static constexpr double kVelocityOmegaOmega = -2.93945274;
 
     // PayloadVelocity: Q penalizes (vx + L*omega)^2, R=2
-    static constexpr double kPayloadVelocityV     = 1.39300034;
-    static constexpr double kPayloadVelocityTheta = -16.86325622;
-    static constexpr double kPayloadVelocityOmega = -1.60496133;
+    static constexpr double kPayloadVelocityV     = 1.39298637;
+    static constexpr double kPayloadVelocityTheta = -16.87062001;
+    static constexpr double kPayloadVelocityOmega = -1.61984222;
 };
 
 } // namespace pendulum
