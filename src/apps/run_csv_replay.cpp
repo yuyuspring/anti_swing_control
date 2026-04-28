@@ -227,7 +227,8 @@ void write_overwrite_csv(const CsvData& data, const std::string& path, std::size
 int main(int argc, char** argv) {
     const std::string input_path = (argc > 1) ? argv[1] : "crane_imu_obs_debug.csv";
     const std::string output_path = (argc > 2) ? argv[2] : "replay_validation.csv";
-    const std::string overwrite_path = (argc > 3) ? argv[3] : "crane_imu_obs_debug_1.csv";
+    const bool do_overwrite = (argc > 3);
+    const std::string overwrite_path = do_overwrite ? argv[3] : "";
 
     try {
         CsvData data = load_csv(input_path);
@@ -386,8 +387,10 @@ int main(int argc, char** argv) {
                    << obs.Rg[2] - recorded_rg_z << '\n';
         }
 
-        // Write overwritten CSV with same format as input
-        write_overwrite_csv(data, overwrite_path, first_valid_index);
+        // Write overwritten CSV with same format as input (only if requested)
+        if (do_overwrite) {
+            write_overwrite_csv(data, overwrite_path, first_valid_index);
+        }
 
         std::cout << std::fixed << std::setprecision(6);
         std::cout << "replay rows: " << pitch_stats.count << "\n";
@@ -407,7 +410,9 @@ int main(int argc, char** argv) {
                   << rg_y_stats.rmse() << ", "
                   << rg_z_stats.rmse() << "\n";
         std::cout << "saved replay validation csv to " << output_path << "\n";
-        std::cout << "saved overwrite csv to " << overwrite_path << "\n";
+        if (do_overwrite) {
+            std::cout << "saved overwrite csv to " << overwrite_path << "\n";
+        }
 
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

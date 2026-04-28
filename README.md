@@ -41,6 +41,40 @@ Three executables will be generated:
 
 ---
 
+## Quick Start Scripts
+
+### `run.sh` — Closed-Loop LQR Simulation Pipeline
+
+Runs the full simulation pipeline: compute LQR gains → build → run all 5 modes → generate plots/animation.
+
+```bash
+./run.sh                    # Full pipeline (all plots + animation)
+./run.sh --comparison  -c   # Only comparison.png
+./run.sh --brake       -b   # Only brake_phase.png
+./run.sh --animation   -m   # Only lqr_brake_animation.mp4
+./run.sh --help        -h   # Show usage
+```
+
+Outputs (in `build/`):
+- `comparison.png` — 5-mode full-trajectory comparison
+- `brake_phase.png` — 5-mode brake-phase comparison
+- `lqr_brake_animation.mp4` — Animated brake-phase swing visualization
+
+### `run_csv_replay.sh` — Observer CSV Replay Validation
+
+Replays recorded IMU data through the observer and validates against recorded outputs.
+
+```bash
+./run_csv_replay.sh                    # Default input: crane_imu_obs_debug.csv
+./run_csv_replay.sh my_data.csv        # Specify custom input
+```
+
+Outputs:
+- `replay_validation.csv` — Recorded vs replay comparison data
+- `replay_validation.png` — 4-subplot validation visualization
+
+---
+
 ## 1. Closed-Loop LQR Simulation (New)
 
 Drone moves from position A to position B while suppressing payload swing using observer feedback and LQR control.
