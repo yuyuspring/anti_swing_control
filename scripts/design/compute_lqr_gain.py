@@ -262,7 +262,7 @@ def generate_lqr_gains(
     # Step 5: 确定输出路径
     if output_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        output_path = os.path.join(script_dir, "..", "include", "controller", "lqr_gain.hpp")
+        output_path = os.path.join(script_dir, "..", "..", "include", "controller", "lqr_gain.hpp")
         output_path = os.path.abspath(output_path)
 
     # 确保目标目录存在
@@ -341,7 +341,7 @@ def main():
         --rope-length: 绳长 [m]，默认 15.0
         --gravity:     重力加速度 [m/s^2]，默认 9.81
         --dt:          控制周期 [s]，默认 0.02
-        --output:      输出文件路径，默认 ../include/controller/lqr_gain.hpp
+        --output:      输出文件路径，默认 ../../include/controller/lqr_gain.hpp
     """
     parser = argparse.ArgumentParser(description="计算制动控制的 LQR 增益")
     parser.add_argument("--rope-length", type=float, default=15.0, help="绳长 [m]")

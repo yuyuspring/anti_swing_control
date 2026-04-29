@@ -7,8 +7,9 @@ Modular C++ project for pendulum angle observation and LQR-based anti-swing cont
 ```
 ├── CMakeLists.txt
 ├── README.md
-├── run.sh              # One-click closed-loop LQR pipeline
-├── run_csv_replay.sh   # One-click CSV replay validation
+├── run_lqr.sh          # One-click closed-loop LQR pipeline
+├── run_mpc.sh          # One-click MPC pipeline
+├── run_replay.sh       # One-click observer replay validation
 ├── include/            # Public headers
 │   ├── observer/       # Pendulum observer (legacy C core + C++ wrapper)
 │   ├── controller/     # LQR controller
@@ -24,7 +25,11 @@ Modular C++ project for pendulum angle observation and LQR-based anti-swing cont
 │   ├── sensor/
 │   ├── simulation/
 │   └── utils/
-├── scripts/            # Python scripts (LQR gain design, plotting)
+├── scripts/            # Python scripts
+│   ├── design/         # LQR gain design
+│   ├── simulation/     # MPC simulation
+│   ├── plot/           # Plotting scripts
+│   └── analysis/       # Comparison & analysis
 ├── data/               # Input CSV data (crane IMU recordings)
 ├── results/            # Output CSV / plots / animations (gitignored)
 ├── docs/               # Documentation
@@ -48,30 +53,30 @@ Three executables will be generated:
 
 ## Quick Start Scripts
 
-### `run.sh` — Closed-Loop LQR Simulation Pipeline
+### `run_lqr.sh` — Closed-Loop LQR Simulation Pipeline
 
 Runs the full simulation pipeline: compute LQR gains → build → run all 5 modes → generate plots/animation.
 
 ```bash
-./run.sh                    # Full pipeline (all plots + animation)
-./run.sh --comparison  -c   # Only comparison.png
-./run.sh --brake       -b   # Only brake_phase.png
-./run.sh --animation   -m   # Only lqr_brake_animation.mp4
-./run.sh --help        -h   # Show usage
+./run_lqr.sh                    # Full pipeline (all plots + animation)
+./run_lqr.sh --comparison  -c   # Only comparison.png
+./run_lqr.sh --brake       -b   # Only brake_phase.png
+./run_lqr.sh --animation   -m   # Only lqr_brake_animation.mp4
+./run_lqr.sh --help        -h   # Show usage
 ```
 
-Outputs (in `build/`):
+Outputs (in `results/lqr/`):
 - `comparison.png` — 5-mode full-trajectory comparison
 - `brake_phase.png` — 5-mode brake-phase comparison
 - `lqr_brake_animation.mp4` — Animated brake-phase swing visualization
 
-### `run_csv_replay.sh` — Observer CSV Replay Validation
+### `run_replay.sh` — Observer CSV Replay Validation
 
 Replays recorded IMU data through the observer and validates against recorded outputs.
 
 ```bash
-./run_csv_replay.sh                    # Default input: data/crane_imu_obs_debug.csv
-./run_csv_replay.sh my_data.csv        # Specify custom input
+./run_replay.sh                    # Default input: data/crane_imu_obs_debug.csv
+./run_replay.sh my_data.csv        # Specify custom input
 ```
 
 Outputs (in `results/`):
@@ -112,7 +117,7 @@ Default parameters:
 ### Plot Results
 
 ```bash
-python3 ../scripts/plot_closed_loop.py closed_loop_results.csv
+python3 ../scripts/plot/plot_closed_loop.py closed_loop_results.csv
 ```
 
 The plot window will stay open. **Close it manually when you are done.**
@@ -138,7 +143,7 @@ Generates (in `results/`):
 ### Plot Results
 
 ```bash
-python3 ../scripts/plot_results.py results/simulation_results.csv results/simulation_results.png
+python3 ../scripts/plot/plot_results.py results/simulation_results.csv results/simulation_results.png
 ```
 
 The plot window will stay open. **Close it manually when you are done.**
@@ -162,7 +167,7 @@ Generates (in `results/`):
 ### Plot Results
 
 ```bash
-python3 ../scripts/plot_replay_results.py results/replay_validation.csv results/replay_validation.png
+python3 ../scripts/plot/plot_replay_results.py results/replay_validation.csv results/replay_validation.png
 ```
 
 The plot window will stay open. **Close it manually when you are done.**
@@ -171,11 +176,11 @@ The plot window will stay open. **Close it manually when you are done.**
 
 ## LQR Gain Tuning
 
-Edit `scripts/compute_lqr_gain.py` to adjust LQR weights, then regenerate the gain header:
+Edit `scripts/design/compute_lqr_gain.py` to adjust LQR weights, then regenerate the gain header:
 
 ```bash
 cd /home/hcy/work_space/pend_observer_test
-python3 scripts/compute_lqr_gain.py --q-theta 30.0 --q-omega 10.0 --r-ax 1.0
+python3 scripts/design/compute_lqr_gain.py --q-theta 30.0 --q-omega 10.0 --r-ax 1.0
 ```
 
 Recompile:

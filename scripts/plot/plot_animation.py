@@ -243,15 +243,15 @@ def main():
 
 if __name__ == "__main__":
     import os
-    build_dir = os.path.join(os.path.dirname(__file__), "..", "build")
+    results_dir = os.path.join(os.path.dirname(__file__), "..", "..", "results", "lqr")
     default_files = [
-        os.path.join(build_dir, "closed_loop_full.csv"),
-        os.path.join(build_dir, "closed_loop_shortest.csv"),
-        os.path.join(build_dir, "closed_loop_minswing.csv"),
-        os.path.join(build_dir, "closed_loop_velomega.csv"),
-        os.path.join(build_dir, "closed_loop_payload.csv"),
-        os.path.join(build_dir, "closed_loop_minenergy.csv"),
-        os.path.join(build_dir, "closed_loop_systemenergy.csv"),
+        os.path.join(results_dir, "closed_loop_full.csv"),
+        os.path.join(results_dir, "closed_loop_shortest.csv"),
+        os.path.join(results_dir, "closed_loop_minswing.csv"),
+        os.path.join(results_dir, "closed_loop_velomega.csv"),
+        os.path.join(results_dir, "closed_loop_payload.csv"),
+        os.path.join(results_dir, "closed_loop_minenergy.csv"),
+        os.path.join(results_dir, "closed_loop_systemenergy.csv"),
     ]
     if len(sys.argv) < 6 and all(os.path.exists(f) for f in default_files):
         # Inject default files before argparse sees the args

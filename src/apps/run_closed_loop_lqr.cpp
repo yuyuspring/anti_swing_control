@@ -45,6 +45,6 @@ int main(int argc, char* argv[]) {
     }
     sim.saveResults(filename);
 
-    std::cout << "Done. Run: python3 ../scripts/plot_closed_loop.py " << filename << "\n";
+    std::cout << "Done. Run: python3 ../scripts/plot/plot_closed_loop.py " << filename << "\n";
     return 0;
 }
