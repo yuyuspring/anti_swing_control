@@ -14,6 +14,12 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # ============================================================================
+# Find dependencies
+# ============================================================================
+find_package(ruckig CONFIG REQUIRED)
+find_package(fmt REQUIRED)
+
+# ============================================================================
 # Core library (new modular code)
 # ============================================================================
 add_library(pendulum STATIC
@@ -54,6 +60,18 @@ add_custom_command(TARGET run_open_loop_sim POST_BUILD
 # New closed-loop LQR simulation
 add_executable(run_closed_loop_lqr src/apps/run_closed_loop_lqr.cpp)
 target_link_libraries(run_closed_loop_lqr PRIVATE pendulum)
+
+# ============================================================================
+# Ruckig S-curve trajectory planner (standalone demo)
+# ============================================================================
+add_executable(run_ruckig_trajectory
+    src/apps/run_ruckig_trajectory.cpp
+    src/trajectory/ruckig_planner.cpp
+)
+target_link_libraries(run_ruckig_trajectory PRIVATE
+    pendulum
+    ruckig::ruckig
+)
 
 # ============================================================================
 # Install targets (optional)

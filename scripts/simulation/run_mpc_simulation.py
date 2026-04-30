@@ -62,7 +62,7 @@ def get_mpc_config(mode):
         q_ke = 0.5
         q_pe = 1000.0
         q_drone = 1.0
-        q_omega = 0.1
+        q_omega = 1.0
         Q = np.array([
             [q_drone + q_ke, 0.0, q_ke * L],
             [0.0, q_pe, 0.0],
