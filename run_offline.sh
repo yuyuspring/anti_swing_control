@@ -20,15 +20,22 @@ print_usage() {
 Usage: ./run_offline.sh [OPTION]
 
 Options:
-  --jerk J           第0段 jerk 大小 (m/s³), 默认 0.3
-  --brake-start T    刹车开始时间 (s), 默认 40.0
-  --plot-only, -p    跳过仿真，直接绘图
-  --help, -h         显示此帮助信息
+  --model {simple,pitch}  无人机模型, 默认 simple
+  --jerk J                第0段 jerk 大小 (m/s³ or rad/s³), 默认 0.3
+  --brake-start T         刹车开始时间 (s), 默认 40.0
+  --plot-only, -p         跳过仿真，直接绘图
+  --help, -h              显示此帮助信息
 
 示例:
-  ./run_offline.sh --jerk 0.3          # 用小 jerk 获得低摆动
-  ./run_offline.sh --jerk 0.17         # 极小 jerk，几乎无残余摆动
-  ./run_offline.sh --plot-only         # 只重新画图
+  ./run_offline.sh                          # 默认 simple 模型
+  ./run_offline.sh --model pitch            # 俯仰角模型
+  ./run_offline.sh --model pitch --jerk 0.3 # 俯仰角模型, 小 jerk
+  ./run_offline.sh --plot-only              # 只重新画图
+
+模型说明:
+  simple: 直接加速度控制 (ax 为控制量)
+  pitch:  俯仰角控制, 拉力沿体轴z, 垂向自动稳定
+          ax = g*tan(pitch), T = m*g/cos(pitch)
 
 输出:
   - results/trajectory/offline_three_phase.csv
@@ -37,16 +44,20 @@ Options:
 
 参数说明:
   jerk 越小 → Max θ 越小 → 残余摆动越小 → 但刹车时间和距离越长
-  jerk 越大 → 刹车越快 → 但激发摆动越强
 EOF
 }
 
+MODEL=""
 JERK=""
 BRAKE_START=""
 PLOT_ONLY=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --model)
+            MODEL="--model $2"
+            shift 2
+            ;;
         --jerk)
             JERK="--jerk $2"
             shift 2
@@ -84,7 +95,7 @@ if [[ "$PLOT_ONLY" == false ]]; then
     echo "========================================"
     echo "Step 1: Running offline trajectory simulation ..."
     echo "========================================"
-    python3 "$PROJECT_ROOT/scripts/simulation/run_offline_trajectory.py" $JERK $BRAKE_START
+    python3 "$PROJECT_ROOT/scripts/simulation/run_offline_trajectory.py" $MODEL $JERK $BRAKE_START
 fi
 
 # Step 2: Run plotting

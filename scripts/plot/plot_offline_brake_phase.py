@@ -75,18 +75,29 @@ def plot_brake_phase(csv_path: str, png_path: str = None):
 
     # 5. Control input
     ax = axes[4]
-    ax.plot(sub["time_rel"], sub["ax_applied_m_s2"], color=color,
-            linewidth=1.5, label="Applied ax")
-    ax.plot(sub["time_rel"], sub["ax_cmd_m_s2"], color=color,
-            linewidth=1.0, linestyle="--", alpha=0.6, label="Commanded ax")
-    ax.axhline(2, color="gray", linestyle="--", alpha=0.3)
-    ax.axhline(-2, color="gray", linestyle="--", alpha=0.3)
+    has_pitch = "pitch_applied_rad" in sub.columns and sub["pitch_applied_rad"].abs().max() > 1e-6
+    if has_pitch:
+        ax.plot(sub["time_rel"], np.degrees(sub["pitch_applied_rad"]), color=color,
+                linewidth=1.5, label="Applied pitch")
+        ax.plot(sub["time_rel"], np.degrees(sub["pitch_cmd_rad"]), color=color,
+                linewidth=1.0, linestyle="--", alpha=0.6, label="Commanded pitch")
+        ax.axhline(np.degrees(np.arctan(2/9.81)), color="gray", linestyle="--", alpha=0.3)
+        ax.axhline(-np.degrees(np.arctan(2/9.81)), color="gray", linestyle="--", alpha=0.3)
+        ax.set_ylabel("Pitch [deg]")
+        ax.set_title("Drone Pitch Angle")
+    else:
+        ax.plot(sub["time_rel"], sub["ax_applied_m_s2"], color=color,
+                linewidth=1.5, label="Applied ax")
+        ax.plot(sub["time_rel"], sub["ax_cmd_m_s2"], color=color,
+                linewidth=1.0, linestyle="--", alpha=0.6, label="Commanded ax")
+        ax.axhline(2, color="gray", linestyle="--", alpha=0.3)
+        ax.axhline(-2, color="gray", linestyle="--", alpha=0.3)
+        ax.set_ylabel("Acceleration [m/s²]")
+        ax.set_title("Control Input")
     ax.axhline(0, color="black", linestyle="-", alpha=0.2)
-    ax.set_ylabel("Acceleration [m/s²]")
     ax.set_xlabel("Time since brake start [s]")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
-    ax.set_title("Control Input")
 
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig(png_path, dpi=150)

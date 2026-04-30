@@ -57,16 +57,26 @@ def plot_offline(csv_path: str, png_path: str = None):
 
     # 5. Control input
     ax = axes[4]
-    ax.plot(t, df["ax_applied_m_s2"], "m-", label="Applied ax", linewidth=1.5)
-    ax.plot(t, df["ax_cmd_m_s2"], "k--", label="Commanded ax", linewidth=1.0, alpha=0.5)
-    ax.axhline(2, color="gray", linestyle="--", alpha=0.3)
-    ax.axhline(-2, color="gray", linestyle="--", alpha=0.3)
+    has_pitch = "pitch_applied_rad" in df.columns and df["pitch_applied_rad"].abs().max() > 1e-6
+    if has_pitch:
+        ax.plot(t, np.degrees(df["pitch_applied_rad"]), "m-", label="Applied pitch", linewidth=1.5)
+        ax.plot(t, np.degrees(df["pitch_cmd_rad"]), "k--", label="Commanded pitch", linewidth=1.0, alpha=0.5)
+        g = 9.81
+        ax.axhline(np.degrees(np.arctan(2/g)), color="gray", linestyle="--", alpha=0.3)
+        ax.axhline(-np.degrees(np.arctan(2/g)), color="gray", linestyle="--", alpha=0.3)
+        ax.set_ylabel("Pitch [deg]")
+        ax.set_title("Drone Pitch Angle")
+    else:
+        ax.plot(t, df["ax_applied_m_s2"], "m-", label="Applied ax", linewidth=1.5)
+        ax.plot(t, df["ax_cmd_m_s2"], "k--", label="Commanded ax", linewidth=1.0, alpha=0.5)
+        ax.axhline(2, color="gray", linestyle="--", alpha=0.3)
+        ax.axhline(-2, color="gray", linestyle="--", alpha=0.3)
+        ax.set_ylabel("Acceleration [m/s²]")
+        ax.set_title("Control Input (Open-loop Offline)")
     ax.axhline(0, color="black", linestyle="-", alpha=0.2)
-    ax.set_ylabel("Acceleration [m/s²]")
     ax.set_xlabel("Time [s]")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
-    ax.set_title("Control Input (Open-loop Offline)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig(png_path, dpi=150)
