@@ -45,7 +45,7 @@ INITIAL_THETA = 0.1
 INITIAL_THETA_DOT = 0.0
 
 # MPC 参数
-N = 40             # 预测时域（4 s = 40 × 0.1 s）
+N = 100             # 预测时域（4 s = 40 × 0.1 s）
 du_max = JERK_MAX * DT_CONTROL  # = 0.20
 
 
@@ -61,8 +61,8 @@ def get_mpc_config(mode):
         #    q_omega   角速度正则项       保证 Q 矩阵正定，额外抑制摆速
         q_ke = 0.5
         q_pe = 1000.0
-        q_drone = 1.0
-        q_omega = 1.0
+        q_drone = 1
+        q_omega = 1
         Q = np.array([
             [q_drone + q_ke, 0.0, q_ke * L],
             [0.0, q_pe, 0.0],

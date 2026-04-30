@@ -19,8 +19,8 @@ def plot_brake_phase(csv_path: str, png_path: str = None):
     if png_path is None:
         png_path = csv_path.replace(".csv", "_brake.png")
 
-    # 检测刹车开始
-    braking = df[df["ax_applied_m_s2"] < -0.1]
+    # 检测刹车开始 (用指令 ax_cmd 避免 pitch 伺服过冲的误判)
+    braking = df[df["ax_cmd_m_s2"] < -0.1]
     if len(braking) == 0:
         print("No braking detected")
         return
