@@ -90,33 +90,50 @@ def build_continuous_systems():
     # P = Kv * Ge_cl   (.m 中 gain 标量抵消)
     P = Kv * Ge_cl
 
-    # NOTE: 原始 .m 代码使用 gain=1.5 且 a=a1+a2，导致闭环不稳定（RHP 极点）。
-    # 物理上摆动是阻力，a2 应与 a1 反号。
-    # 这里 pend_sys 取负号，使得 a2 = pend_sys*a1 自然为阻力，
-    # 总加速度 a = a1 + a2 = a1*(1 + pend_sys)。
-    #  a2 / a1 = -m / (M + m)  m/M = 1.5 => a2/a1 = -0.6
-    PEND_GAIN = 0.6
+    # 摆动耦合传递函数：
+    #   pend_eul 把基座加速度映射为摆角 theta。
+    #   物理上，单摆感受到的是机体的实际加速度 a，不是名义加速度 a1。
+    #   稳态时 theta = (-1/g) * a，反作用力 a2 = -(m/M) * a。
+    #   这里用 PEND_GAIN 表示 m/M，pend_sys 的直流增益为 -PEND_GAIN。
+    m = 180 # 摆质量，单位 kg
+    M = 120 # 机体质量，单位 kg
+    PEND_GAIN = m/M
     pend_sys = control.tf([-PEND_GAIN * G], [L, 0, G])
 
     Inte = control.tf([1], [1, 0])
 
-    # 闭环推导（物理正确版：a = a1 + a2，a2 为负）：
+    # 闭环推导（单摆输入为实际加速度 a）：
+    #
+    # %% plant (修正版：单摆输入为实际加速度 a)
+    #
+    #                                                 +----------------------------|
+    #               e       eul     eul         a1    | a                          |
+    #  r--->o--->Kv--->gain----->P------>1/gain--+--->o--->1/s----->y             |
+    #       |                                    |    |         |                 |
+    #       -------------------------------------+    |          |                 |
+    #                                                  |          |                 |
+    #                                                  |          |a2              |
+    #                                                  +--->pend---->w,eul----gain1---+
+    #                                                     (输入 a)
+    #
+    #   代数关系：
     #   e = r - v
     #   a1 = P * e
-    #   a2 = pend_sys * a1   (pend_sys < 0, 故 a2 与 a1 反号)
-    #   a  = a1 + a2 = (1 + pend_sys) * a1
-    #   v  = Inte * a = Inte * (1 + pend_sys) * a1
+    #   a2 = pend_sys * a          # 单摆由实际加速度 a 驱动
+    #   a  = a1 + a2 = a1 + pend_sys * a
+    #   => a = a1 / (1 - pend_sys)  # 从 a1 到 a 的传递
+    #   v  = Inte * a = Inte * a1 / (1 - pend_sys)
     #
-    # => a1 = P / (1 + P*Inte*(1+pend_sys)) * r
-    # => v  = Inte*(1+pend_sys)*P / (1 + P*Inte*(1+pend_sys)) * r
-    # => a2 = pend_sys*P / (1 + P*Inte*(1+pend_sys)) * r
-    # => theta   = pend_eul * a1
+    # 从 a1 到 v 的开环：Inte / (1 - pend_sys)
+    # => a1 = feedback(P, Inte / (1 - pend_sys)) * r
 
-    T_a1 = control.feedback(P, Inte * (1 + pend_sys))
-    T_v = Inte * (1 + pend_sys) * T_a1
-    T_a2 = pend_sys * T_a1
-    T_theta = pend_eul * T_a1
-    T_omega = pend_w * T_a1
+    T_a_a1 = 1 / (1 - pend_sys)          # 从 a1 到 a
+    T_a1 = control.feedback(P, Inte * T_a_a1)
+    T_a = T_a_a1 * T_a1
+    T_v = Inte * T_a
+    T_a2 = pend_sys * T_a
+    T_theta = pend_eul * T_a             # 单摆输入是实际加速度 a
+    T_omega = pend_w * T_a
 
     return T_v, T_a1, T_a2, T_theta, T_omega
 

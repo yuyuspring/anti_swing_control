@@ -36,7 +36,7 @@ struct ClosedLoopConfig {
     double initialThetaDot = 0.0;    ///< Initial angular rate [rad/s]
 
     // Damping parameters
-    double payloadMass = 150.0;      ///< Payload mass [kg]
+    double payloadMass = 180.0;      ///< Payload mass [kg]
     double dragCoeff = 1.0;          ///< Drag coefficient Cd [-]
     double dragArea = 0.5;           ///< Reference area [m^2]
     double linearDampingCoeff = 0.15; ///< Linear damping coefficient [1/s]

@@ -24,7 +24,7 @@ public:
      * @param vxMax         Maximum horizontal velocity [m/s].
      */
     SlungLoadDynamics(double ropeLengthM, double vxMax = 1e6,
-                      double payloadMass = 150.0,
+                      double payloadMass = 180.0,
                       double dragCoeff = 1.0,
                       double dragArea = 0.5,
                       double linearDampingCoeff = 0.15);
