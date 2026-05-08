@@ -180,7 +180,7 @@ def generate_lqr_gains(
     #   退出饱和速度 ≈ 2.0 / K_vx
 
     # Mode 1: Full - 均衡策略
-    K_full = solve_lqr(Ad, Bd, [2.0, 30.0, 10.0], 8.0)
+    K_full = solve_lqr(Ad, Bd, [1.0, 10.0, 1.0], 2.0)
 
     # Mode 2: Shortest - 优先速度收敛（最短刹车距离）
     K_shortest = solve_lqr(Ad, Bd, [8.0, 2.0, 1.0], 2.0)
@@ -214,10 +214,10 @@ def generate_lqr_gains(
     K_minenergy = solve_lqr(Ad, Bd, Q_minenergy, 3.0)
 
     # Mode 7: SystemEnergy - 最小化系统总能量（无人机动能 + 摆势能 + 摆动能）
-    q_ke_sys = 5.0
-    q_pe_sys = 1.0
-    q_drone = 5.0
-    q_omega_extra_sys = 1.0
+    q_ke_sys = 1
+    q_pe_sys = 3000.0
+    q_drone = 1.0
+    q_omega_extra_sys = 1
     Q_systemenergy = np.array([
         [q_drone + q_ke_sys, 0.0, q_ke_sys * rope_length],
         [0.0, q_pe_sys, 0.0],

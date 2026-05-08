@@ -18,9 +18,9 @@ enum class LqrMode {
 
 struct LqrGain {
     // Full: Q=[2,30,10], R=2
-    static constexpr double kFullV     = 0.49678350;
-    static constexpr double kFullTheta = -1.18520599;
-    static constexpr double kFullOmega = -2.17864616;
+    static constexpr double kFullV     = 0.70115647;
+    static constexpr double kFullTheta = -1.56251112;
+    static constexpr double kFullOmega = -2.06776732;
 
     // Shortest: Q=[8,2,1], R=3
     static constexpr double kShortestV     = 1.95969827;
@@ -48,9 +48,9 @@ struct LqrGain {
     static constexpr double kMinEnergyOmega = -2.37810769;
 
     // SystemEnergy: Q penalizes drone KE + pendulum energy, R=2
-    static constexpr double kSystemEnergyV     = 1.79072359;
-    static constexpr double kSystemEnergyTheta = -15.30929696;
-    static constexpr double kSystemEnergyOmega = -1.78684522;
+    static constexpr double kSystemEnergyV     = 0.79998938;
+    static constexpr double kSystemEnergyTheta = -28.07548069;
+    static constexpr double kSystemEnergyOmega = -18.30082927;
 };
 
 } // namespace pendulum
