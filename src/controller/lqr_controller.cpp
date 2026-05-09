@@ -6,48 +6,26 @@ namespace pendulum {
 
 LqrController::LqrController(LqrMode mode, double axLimit) : axLimit_(axLimit) {
     switch (mode) {
-        case LqrMode::kFull:
-            kV_ = LqrGain::kFullV;
-            kTheta_ = LqrGain::kFullTheta;
-            kOmega_ = LqrGain::kFullOmega;
+        case LqrMode::kDiagonal:
+            kV_ = LqrGain::kDiagonalV;
+            kTheta_ = LqrGain::kDiagonalTheta;
+            kOmega_ = LqrGain::kDiagonalOmega;
+            kIntegral_ = LqrGain::kDiagonalIntegral;
             break;
-        case LqrMode::kShortest:
-            kV_ = LqrGain::kShortestV;
-            kTheta_ = LqrGain::kShortestTheta;
-            kOmega_ = LqrGain::kShortestOmega;
-            break;
-        case LqrMode::kMinSwing:
-            kV_ = LqrGain::kMinSwingV;
-            kTheta_ = LqrGain::kMinSwingTheta;
-            kOmega_ = LqrGain::kMinSwingOmega;
-            break;
-        case LqrMode::kVelocityOmega:
-            kV_ = LqrGain::kVelocityOmegaV;
-            kTheta_ = LqrGain::kVelocityOmegaTheta;
-            kOmega_ = LqrGain::kVelocityOmegaOmega;
-            break;
-        case LqrMode::kPayloadVelocity:
-            kV_ = LqrGain::kPayloadVelocityV;
-            kTheta_ = LqrGain::kPayloadVelocityTheta;
-            kOmega_ = LqrGain::kPayloadVelocityOmega;
-            break;
-        case LqrMode::kMinEnergy:
-            kV_ = LqrGain::kMinEnergyV;
-            kTheta_ = LqrGain::kMinEnergyTheta;
-            kOmega_ = LqrGain::kMinEnergyOmega;
-            break;
-        case LqrMode::kSystemEnergy:
-            kV_ = LqrGain::kSystemEnergyV;
-            kTheta_ = LqrGain::kSystemEnergyTheta;
-            kOmega_ = LqrGain::kSystemEnergyOmega;
+        case LqrMode::kCoupled:
+            kV_ = LqrGain::kCoupledV;
+            kTheta_ = LqrGain::kCoupledTheta;
+            kOmega_ = LqrGain::kCoupledOmega;
+            kIntegral_ = LqrGain::kCoupledIntegral;
             break;
     }
 }
 
-double LqrController::computeControl(const State& state) const {
-    double u = -(kV_ * state.vx +
+double LqrController::computeControl(const State& state, double vxRef) const {
+    double u = -(kV_ * (state.vx - vxRef) +
                  kTheta_ * state.theta +
-                 kOmega_ * state.omega);
+                 kOmega_ * state.omega +
+                 kIntegral_ * state.vxIntegral);
     return saturate(u, axLimit_);
 }
 

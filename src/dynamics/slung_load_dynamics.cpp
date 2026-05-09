@@ -9,14 +9,16 @@ namespace pendulum {
 
 SlungLoadDynamics::SlungLoadDynamics(double ropeLengthM, double vxMax,
                                      double payloadMass, double dragCoeff,
-                                     double dragArea, double linearDampingCoeff)
+                                     double dragArea, double linearDampingCoeff,
+                                     double pendulumGain)
     : L_(ropeLengthM),
       vxMax_(vxMax),
       payloadMass_(payloadMass),
       dragCoeff_(dragCoeff),
       dragArea_(dragArea),
       airDensity_(1.225),
-      linearDampingCoeff_(linearDampingCoeff) {
+      linearDampingCoeff_(linearDampingCoeff),
+      pendulumGain_(pendulumGain) {
     assert(L_ > 0.0 && "Rope length must be positive");
     assert(payloadMass_ > 0.0 && "Payload mass must be positive");
 }
@@ -27,17 +29,27 @@ void SlungLoadDynamics::computeDerivative(const SystemState& state,
                                           double& dvx,
                                           double& dtheta,
                                           double& dthetaDot) const {
-    dpx = state.droneVx;
-    dvx = axMS2;
-    dtheta = state.thetaDot;
-
     const double st = std::sin(state.theta);
     const double ct = std::cos(state.theta);
+    const double mu = pendulumGain_;
 
-    // Non-linear pendulum equation with linear + quadratic damping
-    // theta_ddot = -(g*sin(theta) + ax*cos(theta)) / L - c_lin * theta_dot + drag_term
+    // Full coupled model: actual UAV acceleration from Lagrangian equations.
+    // Key fix: pendulum equation must use the REAL UAV acceleration (dvx),
+    // not the control input (axMS2). This was the main source of the large
+    // steady-state swing angle in cruise.
+    //
+    // The mass-correction denominator (1-mu*cos^2) and centrifugal term
+    // (mu*L*omega^2*sin) have only minor effect for this system's parameters.
+    double denom = 1.0 - mu * ct * ct;
+    dvx = (axMS2 + mu * kGravity * st * ct
+           + mu * L_ * state.thetaDot * state.thetaDot * st) / denom;
+
+    dpx = state.droneVx;
+    dtheta = state.thetaDot;
+
+    // Non-linear pendulum equation: use actual UAV acceleration (dvx), not axMS2
     double gravityTorque = kGravity * st;
-    double inertialTorque = axMS2 * ct;
+    double inertialTorque = dvx * ct;
     double linearDrag = linearDampingCoeff_ * state.thetaDot;
 
     // === Air drag based on payload absolute velocity ===
@@ -102,8 +114,10 @@ void SlungLoadDynamics::step(SystemState& state, double axMS2, double dt) {
     state.thetaDot += (k1_td + 2.0 * k2_td + 2.0 * k3_td + k4_td) * dt / 6.0;
     state.time += dt;
 
-    // Velocity saturation
-    state.droneVx = clamp(state.droneVx, -vxMax_, vxMax_);
+    // Store actual UAV acceleration for logging
+    double dpx_tmp, dvx_tmp, dtheta_tmp, dthetaDot_tmp;
+    computeDerivative(state, axMS2, dpx_tmp, dvx_tmp, dtheta_tmp, dthetaDot_tmp);
+    state.droneAx = dvx_tmp;
 }
 
 } // namespace pendulum

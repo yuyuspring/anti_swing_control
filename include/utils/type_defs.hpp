@@ -35,6 +35,7 @@ struct SystemState {
     double time = 0.0;       ///< Simulation time [s]
     double dronePx = 0.0;    ///< Drone horizontal position [m]
     double droneVx = 0.0;    ///< Drone horizontal velocity [m/s]
+    double droneAx = 0.0;    ///< Drone actual horizontal acceleration [m/s^2]
     double theta = 0.0;      ///< Pendulum angle [rad], 0 = hanging straight down
     double thetaDot = 0.0;   ///< Pendulum angular velocity [rad/s]
 };
@@ -49,6 +50,7 @@ struct ClosedLoopLogEntry {
     double omegaEstimate = 0.0;    ///< Observed angular rate [rad/s]
     double axCommand = 0.0;        ///< LQR commanded acceleration [m/s^2]
     double axApplied = 0.0;        ///< Actual acceleration after saturation [m/s^2]
+    double vRef = 0.0;             ///< Reference velocity [m/s]
 };
 
 } // namespace pendulum

@@ -12,8 +12,16 @@ def plot_closed_loop(csv_path: str, png_path: str = None):
     if png_path is None:
         png_path = csv_path.replace(".csv", ".png")
 
-    fig, axes = plt.subplots(5, 1, figsize=(12, 16), sharex=True)
+    fig, axes = plt.subplots(6, 1, figsize=(12, 18), sharex=True)
     fig.suptitle("Closed-Loop LQR Simulation (1D Pitch)", fontsize=14, fontweight="bold")
+
+    # Compute a1, a2, a_total using full coupled model
+    # a1 = nominal acceleration (controller output)
+    # a_total = actual UAV acceleration (from C++ dynamics)
+    # a2 = a_total - a1 (true coupling effect)
+    a1 = df["ax_applied_m_s2"]
+    a_total = df["ax_truth_m_s2"]
+    a2 = a_total - a1
 
     t = df["time_s"]
 
@@ -29,6 +37,8 @@ def plot_closed_loop(csv_path: str, png_path: str = None):
     # 2. Velocity
     ax = axes[1]
     ax.plot(t, df["vx_truth_m_s"], "g-", label="Drone velocity", linewidth=1.5)
+    if "v_ref_m_s" in df.columns:
+        ax.plot(t, df["v_ref_m_s"], "r--", label="Reference velocity", linewidth=1.2)
     ax.set_ylabel("Velocity [m/s]")
     ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
@@ -54,8 +64,19 @@ def plot_closed_loop(csv_path: str, png_path: str = None):
     ax.grid(True, alpha=0.3)
     ax.set_title("Pendulum Pitch Rate")
 
-    # 5. Control input
+    # 5. Acceleration breakdown (a1, a2, a_total)
     ax = axes[4]
+    ax.plot(t, a1, "b-", label="a1 (nominal)", linewidth=1.5)
+    ax.plot(t, a2, "r--", label="a2 (coupling)", linewidth=1.2)
+    ax.plot(t, a_total, "g-", label="a = a1 + a2", linewidth=1.5)
+    ax.axhline(0, color="gray", linestyle="-", alpha=0.3)
+    ax.set_ylabel("Acceleration [m/s²]")
+    ax.legend(loc="upper right")
+    ax.grid(True, alpha=0.3)
+    ax.set_title("Acceleration Breakdown")
+
+    # 6. Control input
+    ax = axes[5]
     ax.plot(t, df["ax_cmd_m_s2"], "m-", label="Commanded ax", linewidth=1.5)
     ax.plot(t, df["ax_applied_m_s2"], "k--", label="Applied ax", linewidth=1.0)
     ax.axhline(0, color="gray", linestyle="-", alpha=0.3)

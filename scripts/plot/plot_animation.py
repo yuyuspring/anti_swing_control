@@ -3,9 +3,9 @@
 Generate animation of LQR closed-loop simulation results.
 
 Usage:
-    python3 plot_animation.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv> <payload.csv>
-    python3 plot_animation.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv> <payload.csv> --phase brake
-    python3 plot_animation.py <full.csv> <shortest.csv> <minswing.csv> <velomega.csv> <payload.csv> --phase full --output lqr_animation.mp4
+    python3 plot_animation.py <diagonal.csv> <coupled.csv>
+    python3 plot_animation.py <diagonal.csv> <coupled.csv> --phase brake
+    python3 plot_animation.py <diagonal.csv> <coupled.csv> --phase full --output lqr_animation.mp4
 """
 
 import sys
@@ -39,8 +39,7 @@ def create_animation(files, labels, output_path="lqr_animation.mp4", phase="brak
            "full"  -> animate full trajectory (0 to t_final)
     """
     data = [load_and_label(f, l) for f, l in zip(files, labels)]
-    colors = {"Full": "blue", "Shortest": "green", "MinSwing": "red",
-              "VelocityOmega": "purple", "PayloadVelocity": "orange", "MinEnergy": "brown", "SystemEnergy": "cyan"}
+    colors = {"Diagonal": "#D62728", "Coupled": "#1F77B4"}
 
     t_brake = detect_brake_start(data[0])
     if t_brake is None:
@@ -245,15 +244,10 @@ if __name__ == "__main__":
     import os
     results_dir = os.path.join(os.path.dirname(__file__), "..", "..", "results", "lqr")
     default_files = [
-        os.path.join(results_dir, "closed_loop_full.csv"),
-        os.path.join(results_dir, "closed_loop_shortest.csv"),
-        os.path.join(results_dir, "closed_loop_minswing.csv"),
-        os.path.join(results_dir, "closed_loop_velomega.csv"),
-        os.path.join(results_dir, "closed_loop_payload.csv"),
-        os.path.join(results_dir, "closed_loop_minenergy.csv"),
-        os.path.join(results_dir, "closed_loop_systemenergy.csv"),
+        os.path.join(results_dir, "closed_loop_diagonal.csv"),
+        os.path.join(results_dir, "closed_loop_coupled.csv"),
     ]
-    if len(sys.argv) < 6 and all(os.path.exists(f) for f in default_files):
+    if len(sys.argv) < 3 and all(os.path.exists(f) for f in default_files):
         # Inject default files before argparse sees the args
         extra_args = []
         if "--" in sys.argv:

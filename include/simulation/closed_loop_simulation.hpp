@@ -12,22 +12,19 @@
 namespace pendulum {
 
 enum class ControlMode {
-    kFull,          ///< 均衡模式
-    kShortest,      ///< 最短刹车距离
-    kMinSwing,      ///< 最小摆角
-    kVelocityOmega,   ///< 速度+角速度联合抑制
-    kPayloadVelocity, ///< payload 绝对速度抑制
-    kMinEnergy,       ///< 最小能量模式
-    kSystemEnergy     ///< 系统总能量最低（无人机+摆）
+    kDiagonal,      ///< 对角Q模式：Q为对角矩阵，直接惩罚各状态量
+    kCoupled        ///< 非对角Q模式：Q包含耦合项，惩罚系统总能量
 };
+
 struct ClosedLoopConfig {
     double dtTruth = 0.001;          ///< Ground-truth dynamics step [s]
     double dtControl = 0.02;         ///< Control / observer period [s]
     double ropeLength = 10.0;        ///< [m]
-    double axMax = 2.0;              ///< Max horizontal acceleration [m/s^2]
+    double axMax = 5.0;              ///< Max nominal acceleration a1 [m/s^2]
+    double axTotalMax = 2.0;         ///< Max total acceleration |a1 + a2| [m/s^2]
     double vxMax = 15.0;             ///< Max horizontal velocity [m/s]
     double jerkMax = 10.0;            ///< Max jerk [m/s^3]
-    ControlMode mode = ControlMode::kFull; ///< Control strategy
+    ControlMode mode = ControlMode::kDiagonal; ///< Control strategy
     double tFinal = 60.0;            ///< Total simulation time [s]
     double pStart = 0.0;             ///< Initial position [m]
     double cruiseSpeed = 15.0;       ///< Cruise speed during constant-velocity phase [m/s]
@@ -40,6 +37,7 @@ struct ClosedLoopConfig {
     double dragCoeff = 1.0;          ///< Drag coefficient Cd [-]
     double dragArea = 0.5;           ///< Reference area [m^2]
     double linearDampingCoeff = 0.15; ///< Linear damping coefficient [1/s]
+    double pendulumGain = 0.6;        ///< Pendulum coupling gain (m/(M+m)) [-]
 
     // Sensor noise std-devs
     double gyroNoiseStd = 0.005;     ///< [rad/s]

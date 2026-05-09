@@ -74,7 +74,8 @@ def build_continuous_systems():
     # Kv = pid(.5,.02,0) * (1 + 0.6*s)
     # pid(.5,.02,0) = (0.5s+0.02)/s
     # Kv = (0.5s+0.02)(0.6s+1)/s = (0.3s^2 + 0.512s + 0.02)/s
-    num_kv = [0.3, 0.512, 0.02]
+    # num_kv = [0.3, 0.512, 0.02]
+    num_kv = [0.3, 5.12, 0.02]
     den_kv = [1, 0]
     Kv = control.tf(num_kv, den_kv)
 

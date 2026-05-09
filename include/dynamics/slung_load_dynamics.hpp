@@ -27,7 +27,8 @@ public:
                       double payloadMass = 180.0,
                       double dragCoeff = 1.0,
                       double dragArea = 0.5,
-                      double linearDampingCoeff = 0.15);
+                      double linearDampingCoeff = 0.15,
+                      double pendulumGain = 0.6);
 
     /**
      * @brief Advance the state by one RK4 step.
@@ -50,6 +51,7 @@ private:
     double airDensity_;  ///< Air density [kg/m^3]
     double dragFactor_;  ///< Pre-computed (Cd * rho * A * L) / (2 * m)
     double linearDampingCoeff_; ///< Linear damping coefficient [1/s]
+    double pendulumGain_;       ///< Pendulum coupling gain (a2 = gain * g * theta) [-]
 
     /**
      * @brief Compute the state derivative f(state, u).

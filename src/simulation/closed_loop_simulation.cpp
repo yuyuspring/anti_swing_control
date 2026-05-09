@@ -15,7 +15,7 @@ ClosedLoopSimulation::ClosedLoopSimulation(const ClosedLoopConfig& config,
       mode_(mode),
       dynamics_(config.ropeLength, config.vxMax,
                 config.payloadMass, config.dragCoeff, config.dragArea,
-                config.linearDampingCoeff),
+                config.linearDampingCoeff, config.pendulumGain),
       controller_(static_cast<LqrMode>(mode), config.axMax) {
     sensor_.setNoiseStd(config.gyroNoiseStd,
                         config.accelNoiseStd,
@@ -49,23 +49,21 @@ void ClosedLoopSimulation::run() {
 
     double axTarget = 0.0;   // LQR / open-loop target acceleration
     double axCmd = 0.0;      // Actual acceleration after jerk limiting
+    double vxErrorIntegral = 0.0;  // LQI integral state
+    double vxErrorPrev = 0.0;      // Previous step error for decay logic
     PendulumObserver::Output est{};
 
     const int controlStepsPerCall =
         static_cast<int>(std::round(config_.dtControl / config_.dtTruth));
     int stepCounter = 0;
 
-    // Compute acceleration phase end time
-    const double accelPhaseEnd = config_.cruiseSpeed / config_.axMax;
+    // Trapezoidal reference parameters
+    const double accelRate = 2.0;   // reference acceleration
+    const double accelPhaseEnd = config_.cruiseSpeed / accelRate;  // = 7.5 s
 
     std::cout << "[ClosedLoopSimulation] Starting simulation...\n"
               << "  Mode            : "
-              << (mode_ == ControlMode::kFull ? "Full" :
-                  mode_ == ControlMode::kShortest ? "Shortest" :
-                  mode_ == ControlMode::kMinSwing ? "MinSwing" :
-                  mode_ == ControlMode::kVelocityOmega ? "VelocityOmega" :
-                  mode_ == ControlMode::kPayloadVelocity ? "PayloadVelocity" :
-                  mode_ == ControlMode::kMinEnergy ? "MinEnergy" : "SystemEnergy")
+              << (mode_ == ControlMode::kDiagonal ? "Diagonal" : "Coupled")
               << "\n"
               << "  Start position  : " << config_.pStart << " m\n"
               << "  Cruise speed    : " << config_.cruiseSpeed << " m/s\n"
@@ -76,12 +74,13 @@ void ClosedLoopSimulation::run() {
               << "  Max acceleration: " << config_.axMax << " m/s^2\n"
               << "  Max velocity    : " << config_.vxMax << " m/s\n"
               << "  Max jerk        : " << config_.jerkMax << " m/s^3\n"
+              << "  Pendulum gain   : " << config_.pendulumGain << " [-]\n"
               << "  Initial theta   : " << rad2deg(config_.initialTheta) << " deg\n"
               << "  Duration        : " << config_.tFinal << " s\n"
               << "  Control period  : " << config_.dtControl << " s\n";
 
     while (state.time <= config_.tFinal + 1e-9) {
-        // Observer update at every dtControl interval (runs in all phases)
+        // Observer update at every dtControl interval
         if (stepCounter % controlStepsPerCall == 0) {
             auto meas = sensor_.generate(state, 0.0, config_.ropeLength);
 
@@ -94,22 +93,63 @@ void ClosedLoopSimulation::run() {
             est = observer_.getOutput();
         }
 
-        // Phase-dependent control: compute target acceleration
+        // Reference velocity: trapezoidal profile (1 m/s² accel / decel)
+        double vRef = 0.0;
         if (state.time < accelPhaseEnd) {
-            // Phase 1: Acceleration
-            axTarget = config_.axMax;
+            // Acceleration: linear ramp 0 -> cruiseSpeed
+            vRef = accelRate * state.time;
         } else if (state.time < config_.brakeStartTime) {
-            // Phase 2: Constant velocity
-            axTarget = 0.0;
+            // Cruise
+            vRef = config_.cruiseSpeed;
         } else {
-            // Phase 3: Braking (LQR takes over)
-            if (stepCounter % controlStepsPerCall == 0) {
-                LqrController::State lqrState;
-                lqrState.vx = state.droneVx;
-                lqrState.theta = est.thetaPitch;
-                lqrState.omega = est.omegaPitch;
-                axTarget = controller_.computeControl(lqrState);
+            // Deceleration: linear ramp cruiseSpeed -> 0
+            double decelRate = 2.0;
+            vRef = config_.cruiseSpeed - decelRate * (state.time - config_.brakeStartTime);
+            if (vRef < 0.0) vRef = 0.0;
+        }
+
+        // LQI closed-loop control (all phases)
+        if (stepCounter % controlStepsPerCall == 0) {
+            double vxError = state.droneVx - vRef;
+
+            // Conditional integration: only integrate if controller would NOT saturate
+            double intPreview = vxErrorIntegral + vxError * config_.dtControl;
+            LqrController::State previewState;
+            previewState.vx = state.droneVx;
+            previewState.theta = est.thetaPitch;
+            previewState.omega = est.omegaPitch;
+            previewState.vxIntegral = intPreview;
+            double uPreview = controller_.computeControl(previewState, vRef);
+
+            if (std::abs(uPreview) < config_.axMax - 1e-6) {
+                vxErrorIntegral = intPreview;
             }
+
+            // Integral decay: when error and integral have same sign and error is shrinking,
+            // decay the integral faster to reduce overshoot
+            if (vxError * vxErrorIntegral > 0.0 && std::abs(vxError) < std::abs(vxErrorPrev)) {
+                vxErrorIntegral *= 0.9;
+            }
+            vxErrorPrev = vxError;
+
+            // Anti-windup clamp
+            const double kIntMax = 3.0;
+            if (vxErrorIntegral > kIntMax) vxErrorIntegral = kIntMax;
+            if (vxErrorIntegral < -kIntMax) vxErrorIntegral = -kIntMax;
+
+            LqrController::State lqrState;
+            lqrState.vx = state.droneVx;
+            lqrState.theta = est.thetaPitch;
+            lqrState.omega = est.omegaPitch;
+            lqrState.vxIntegral = vxErrorIntegral;
+            axTarget = controller_.computeControl(lqrState, vRef);
+
+            // Total acceleration limit disabled for testing
+            // double a2 = config_.pendulumGain * kGravity * est.thetaPitch;
+            // double a1Max = config_.axTotalMax - a2;
+            // double a1Min = -config_.axTotalMax - a2;
+            // if (axTarget > a1Max) axTarget = a1Max;
+            // if (axTarget < a1Min) axTarget = a1Min;
         }
 
         // Apply jerk limit: axCmd can only change by jerkMax * dt per step
@@ -130,6 +170,7 @@ void ClosedLoopSimulation::run() {
         entry.omegaEstimate = est.omegaPitch;
         entry.axCommand = axTarget;
         entry.axApplied = axCmd;
+        entry.vRef = vRef;
         log_.push_back(entry);
 
         // Advance true dynamics
@@ -151,10 +192,11 @@ void ClosedLoopSimulation::saveResults(const std::string& filename) const {
 
     logger.writeHeader({
         "time_s",
-        "px_truth_m", "vx_truth_m_s",
+        "px_truth_m", "vx_truth_m_s", "ax_truth_m_s2",
         "theta_truth_rad", "theta_dot_truth_rad_s",
         "theta_est_rad", "omega_est_rad_s",
-        "ax_cmd_m_s2", "ax_applied_m_s2"
+        "ax_cmd_m_s2", "ax_applied_m_s2",
+        "v_ref_m_s"
     });
 
     for (const auto& e : log_) {
@@ -162,12 +204,14 @@ void ClosedLoopSimulation::saveResults(const std::string& filename) const {
             e.time,
             e.truth.dronePx,
             e.truth.droneVx,
+            e.truth.droneAx,
             e.truth.theta,
             e.truth.thetaDot,
             e.thetaEstimate,
             e.omegaEstimate,
             e.axCommand,
-            e.axApplied
+            e.axApplied,
+            e.vRef
         });
     }
 
