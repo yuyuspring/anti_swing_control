@@ -12,16 +12,16 @@ enum class LqrMode {
 
 struct LqrGain {
     // Diagonal: Q=diag([8,1000,500,5]), R=2
-    static constexpr double kDiagonalV        = 2.17383431;
-    static constexpr double kDiagonalTheta    = -28.57682117;
-    static constexpr double kDiagonalOmega    = -20.16512650;
-    static constexpr double kDiagonalIntegral = 0.19900226;
+    static constexpr double kDiagonalV        = 3.13288806;
+    static constexpr double kDiagonalTheta    = -29.13243617;
+    static constexpr double kDiagonalOmega    = -29.50944395;
+    static constexpr double kDiagonalIntegral = 0.09375183;
 
     // Coupled: Q penalizes system total energy + integral, R=3
-    static constexpr double kCoupledV        = 3.73190169;
-    static constexpr double kCoupledTheta    = -38.00400016;
-    static constexpr double kCoupledOmega    = -6.56048788;
-    static constexpr double kCoupledIntegral = 0.62563527;
+    static constexpr double kCoupledV        = 3.16856284;
+    static constexpr double kCoupledTheta    = -33.48320693;
+    static constexpr double kCoupledOmega    = -22.53165108;
+    static constexpr double kCoupledIntegral = 0.09445991;
 };
 
 } // namespace pendulum

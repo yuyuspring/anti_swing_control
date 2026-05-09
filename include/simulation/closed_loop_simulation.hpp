@@ -43,6 +43,9 @@ struct ClosedLoopConfig {
     double gyroNoiseStd = 0.005;     ///< [rad/s]
     double accelNoiseStd = 0.05;     ///< [m/s^2]
     double velNoiseStd = 0.02;       ///< [m/s]
+
+    // Control input source
+    bool useObserverEstimate = true; ///< true: use observer theta/omega; false: use ground truth
 };
 
 /**

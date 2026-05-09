@@ -8,6 +8,7 @@
 #   ./run_lqr.sh --brake       (-b)   只绘制刹车段对比图（brake_phase.png）
 #   ./run_lqr.sh --animation   (-m)   只生成刹车段动画（lqr_brake_animation.mp4）
 #   ./run_lqr.sh --single <n>  (-s)   只运行模式 n 并生成单张图
+#   ./run_lqr.sh --truth       (-t)   使用真值（ground truth）代替观测器估计
 #   ./run_lqr.sh --help        (-h)   显示帮助
 #
 # 模式编号:
@@ -26,15 +27,17 @@ Options:
   --brake, -b      只生成 brake_phase.png（刹车段对比）
   --animation, -m  只生成 lqr_brake_animation.mp4（刹车段动画）
   --single <n>, -s <n>  只运行模式 n 并生成单张详细图
-  --help, -h       显示此帮助信息
+  --truth, -t          使用真值（ground truth）控制，不用观测器
+  --help, -h           显示此帮助信息
 
 模式编号:
   0=Diagonal (对角Q), 1=Coupled (非对角Q)
 
 Examples:
-  ./run_lqr.sh              # 完整流程
+  ./run_lqr.sh              # 完整流程（观测器）
   ./run_lqr.sh -c           # 仅生成全段对比图
   ./run_lqr.sh -s 1         # 仅运行 Coupled 模式 + 单张图
+  ./run_lqr.sh -t           # 使用真值控制（对比用）
 EOF
 }
 
@@ -50,6 +53,7 @@ mode_to_file() {
 # Parse arguments
 MODE="all"
 SINGLE_MODE=""
+USE_OBSERVER=1
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -77,6 +81,10 @@ while [[ $# -gt 0 ]]; do
             fi
             SINGLE_MODE="$2"
             shift 2
+            ;;
+        --truth|-t)
+            USE_OBSERVER=0
+            shift
             ;;
         --help|-h)
             print_usage
@@ -108,12 +116,12 @@ mkdir -p results/lqr
 cd results/lqr
 
 if [[ -n "$SINGLE_MODE" ]]; then
-    echo "--> Running single mode: $SINGLE_MODE ..."
-    ../../build/run_closed_loop_lqr "$SINGLE_MODE"
+    echo "--> Running single mode: $SINGLE_MODE (observer=$USE_OBSERVER) ..."
+    ../../build/run_closed_loop_lqr "$SINGLE_MODE" 0 10 60 "$USE_OBSERVER"
 else
-    echo "--> Running both modes ..."
-    ../../build/run_closed_loop_lqr 0
-    ../../build/run_closed_loop_lqr 1
+    echo "--> Running both modes (observer=$USE_OBSERVER) ..."
+    ../../build/run_closed_loop_lqr 0 0 10 60 "$USE_OBSERVER"
+    ../../build/run_closed_loop_lqr 1 0 10 60 "$USE_OBSERVER"
 fi
 
 echo ""

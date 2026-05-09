@@ -40,21 +40,11 @@ ImuSensorModel::Measurement ImuSensorModel::generate(
     meas.gyro.z = gyroDist(kGenerator);
 
     // --- Accelerometer (FRD, specific force) ---
-    // Assuming IMU is mounted on the drone (not the payload).
-    // In 1-D horizontal motion with z-down:
-    //   accel_x = ax  (horizontal specific force = drone acceleration)
-    //   accel_z = g   (gravity, since z points down)
-    //
-    // Note: truth.droneVx is velocity, not acceleration.  In the current
-    // simulation architecture the drone acceleration is not stored in the
-    // state.  We approximate it by finite difference or assume the caller
-    // will pass it.  For now we use a simplified model where the horizontal
-    // specific force is zero-mean noise (the observer will still work
-    // because it uses the accelerometer mainly for attitude correction
-    // via the gravity vector).
-    //
-    // TODO: refactor to pass actual drone acceleration into this function.
-    meas.accel.x = accelDist(kGenerator);
+    // IMU is mounted on the drone.  FRD frame: x=forward, y=right, z=down.
+    // For 1-D horizontal motion:
+    //   accel_x = droneAx  (horizontal specific force)
+    //   accel_z = g        (gravity, since z points down)
+    meas.accel.x = truth.droneAx + accelDist(kGenerator);
     meas.accel.y = accelDist(kGenerator);
     meas.accel.z = kGravity + accelDist(kGenerator);
 

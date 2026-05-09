@@ -41,7 +41,10 @@ void SlungLoadDynamics::computeDerivative(const SystemState& state,
     // The mass-correction denominator (1-mu*cos^2) and centrifugal term
     // (mu*L*omega^2*sin) have only minor effect for this system's parameters.
     double denom = 1.0 - mu * ct * ct;
-    dvx = (axMS2 + mu * kGravity * st * ct
+    // axMS2 now represents F/M (UAV thrust acceleration), not F/(M+m).
+    // Full model with u = F/M:
+    // ddx = ((1-mu)*u + mu*g*sin*cos + mu*L*omega^2*sin) / (1 - mu*cos^2)
+    dvx = ((1.0 - mu) * axMS2 + mu * kGravity * st * ct
            + mu * L_ * state.thetaDot * state.thetaDot * st) / denom;
 
     dpx = state.droneVx;

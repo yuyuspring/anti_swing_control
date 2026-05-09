@@ -192,53 +192,106 @@ def load_csv_reference(csv_path):
     return np.array(t_ref), np.array(theta_ref), np.array(omega_ref)
 
 
-def plot_results(data, save_path=None, ref_data=None):
-    """绘制线性模型结果，可选叠加 LQR 参考数据。"""
-    fig, axes = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
+def plot_results(data, save_path=None, ref_data=None, v_ref_data=None):
+    """绘制线性模型结果，可选叠加 LQR 参考数据和 LQR 指令速度。"""
+    fig, axes = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
 
-    axes[0].plot(data['time'], data['r'], 'r--', label='r', linewidth=1.5)
-    axes[0].plot(data['time'], data['v'], 'b', label='v', linewidth=1.5)
+    # Compute cumulative distance by trapezoidal integration
+    t = np.array(data['time'])
+    v = np.array(data['v'])
+    a = np.array(data['a1']) + np.array(data['a2'])
+    distance = np.zeros_like(t)
+    for i in range(1, len(t)):
+        distance[i] = distance[i-1] + 0.5 * (v[i-1] + v[i]) * (t[i] - t[i-1])
+
+    # Detect accel / brake phases by acceleration threshold
+    accel_mask = a > 0.25
+    brake_mask = a < -0.25
+
+    # Merge adjacent segments with gaps shorter than 0.5s
+    def merge_mask(mask, t_arr, max_gap=0.5):
+        out = mask.copy()
+        segments = []
+        i = 0
+        while i < len(out):
+            if out[i]:
+                start = i
+                while i < len(out) and out[i]:
+                    i += 1
+                segments.append((start, i - 1))
+            else:
+                i += 1
+        for j in range(1, len(segments)):
+            prev_end = segments[j - 1][1]
+            curr_start = segments[j][0]
+            if t_arr[curr_start] - t_arr[prev_end] < max_gap:
+                out[prev_end:curr_start + 1] = True
+        return out
+
+    accel_mask = merge_mask(accel_mask, t, 0.5)
+    brake_mask = merge_mask(brake_mask, t, 0.5)
+
+    # Compute accel / brake distances
+    accel_dist, brake_dist = 0.0, 0.0
+    for i in range(1, len(t)):
+        dt = t[i] - t[i-1]
+        if accel_mask[i]:
+            accel_dist += 0.5 * (v[i-1] + v[i]) * dt
+        if brake_mask[i]:
+            brake_dist += 0.5 * (v[i-1] + v[i]) * dt
+
+    # Plot velocity: LQR command v_ref (A), LQR actual r (B), model output v
+    if v_ref_data is not None:
+        t_vref, vref = v_ref_data
+        axes[0].plot(t_vref, vref, 'gray', linestyle='-', linewidth=1.0,
+                     alpha=0.7, label='v_ref (LQR command A)')
+    axes[0].plot(data['time'], data['r'], 'r--', label='r = LQR actual (B)', linewidth=1.5)
+    axes[0].plot(data['time'], data['v'], 'b', label='v = TF model output', linewidth=1.5)
+    # Shade accel / brake regions
+    axes[0].fill_between(t, 0, v, where=accel_mask, alpha=0.15, color='green',
+                         label=f'Accel dist={accel_dist:.1f}m')
+    axes[0].fill_between(t, 0, v, where=brake_mask, alpha=0.15, color='red',
+                         label=f'Brake dist={brake_dist:.1f}m')
     axes[0].set_ylabel('Velocity [m/s]')
-    axes[0].legend()
+    axes[0].legend(loc='upper left', fontsize=8)
     axes[0].grid(True)
-    axes[0].set_title('r-v')
+    axes[0].set_title(f'r-v  (Accel={accel_dist:.1f}m, Brake={brake_dist:.1f}m, Total={distance[-1]:.1f}m)')
 
-    axes[1].plot(data['time'], data['a1'], 'b', label='a1', linewidth=1.5)
-    axes[1].set_ylabel('a1 [m/s²]')
+    # Acceleration breakdown: a1 + a2 = a
+    a = np.array(data['a1']) + np.array(data['a2'])
+    axes[1].plot(data['time'], data['a1'], 'b--', label='a1 (nominal)', linewidth=1.5)
+    axes[1].plot(data['time'], data['a2'], 'r:', label='a2 (coupling)', linewidth=1.5)
+    axes[1].plot(data['time'], a, 'g-', label='a = a1 + a2', linewidth=1.5)
+    axes[1].axhline(0, color='gray', linestyle='-', alpha=0.3)
+    axes[1].set_ylabel('Acceleration [m/s²]')
     axes[1].legend()
     axes[1].grid(True)
-    axes[1].set_title('r-a1')
-
-    axes[2].plot(data['time'], data['a2'], 'b', label='a2', linewidth=1.5)
-    axes[2].set_ylabel('a2 [m/s²]')
-    axes[2].legend()
-    axes[2].grid(True)
-    axes[2].set_title('r-a2')
+    axes[1].set_title('Acceleration Breakdown (a = a1 + a2)')
 
     # 摆角对比
-    axes[3].plot(data['time'], np.degrees(data['theta']), 'b',
+    axes[2].plot(data['time'], np.degrees(data['theta']), 'b',
                  label='TF model theta', linewidth=1.5)
     if ref_data is not None:
         t_ref, theta_ref, _ = ref_data
-        axes[3].plot(t_ref, np.degrees(theta_ref), 'g--',
+        axes[2].plot(t_ref, np.degrees(theta_ref), 'g--',
                      label='LQR truth theta', linewidth=1.5)
-    axes[3].set_ylabel('Theta [deg]')
-    axes[3].legend()
-    axes[3].grid(True)
-    axes[3].set_title('theta comparison')
+    axes[2].set_ylabel('Theta [deg]')
+    axes[2].legend()
+    axes[2].grid(True)
+    axes[2].set_title('theta comparison')
 
     # 角速度对比
-    axes[4].plot(data['time'], np.degrees(data['theta_dot']), 'b',
+    axes[3].plot(data['time'], np.degrees(data['theta_dot']), 'b',
                  label='TF model theta_dot', linewidth=1.5)
     if ref_data is not None:
         t_ref, _, omega_ref = ref_data
-        axes[4].plot(t_ref, np.degrees(omega_ref), 'g--',
+        axes[3].plot(t_ref, np.degrees(omega_ref), 'g--',
                      label='LQR truth theta_dot', linewidth=1.5)
-    axes[4].set_ylabel('Theta_dot [deg/s]')
-    axes[4].set_xlabel('Time [s]')
-    axes[4].legend()
-    axes[4].grid(True)
-    axes[4].set_title('theta_dot comparison')
+    axes[3].set_ylabel('Theta_dot [deg/s]')
+    axes[3].set_xlabel('Time [s]')
+    axes[3].legend()
+    axes[3].grid(True)
+    axes[3].set_title('theta_dot comparison')
 
     plt.tight_layout()
     if save_path:
@@ -306,26 +359,35 @@ def main():
     print("[Build] Constructing continuous closed-loop systems...")
     systems = build_continuous_systems()
 
+    v_ref_data = None
     if args.csv_input:
         t_raw = []
         r_raw = []
+        vref_raw = []
         with open(args.csv_input, 'r') as f:
             reader = csv.reader(f)
             hdr = next(reader)  # skip header
             # closed_loop_systemenergy.csv: time_s, px_truth_m, vx_truth_m_s, ...
             # r 是速度指令，取 vx_truth_m_s 列（索引 2）
             r_col = 2 if 'vx_truth_m_s' in hdr else 1
+            vref_col = hdr.index('v_ref_m_s') if 'v_ref_m_s' in hdr else -1
             if r_col == 1:
                 print("[Warn] CSV 未识别到 vx_truth_m_s，回退到第 2 列")
             for row in reader:
                 t_raw.append(float(row[0]))
                 r_raw.append(float(row[r_col]))
+                if vref_col >= 0:
+                    vref_raw.append(float(row[vref_col]))
         t_raw = np.array(t_raw)
         r_raw = np.array(r_raw)
 
         # 插值到均匀步长 dt
         t = np.arange(t_raw[0], t_raw[-1] + args.dt * 0.5, args.dt)
         r = np.interp(t, t_raw, r_raw)
+        if vref_col >= 0:
+            vref_raw = np.array(vref_raw)
+            vref_interp = np.interp(t, t_raw, vref_raw)
+            v_ref_data = (t, vref_interp)
         print(f"[Input] Loaded {len(t_raw)} samples from {args.csv_input}, "
               f"interpolated to {len(t)} points @ dt={args.dt}s")
     else:
@@ -354,7 +416,7 @@ def main():
         args.out_png = os.path.join(results_dir, 'ctl_pendulum_osc.png')
 
     save_csv(data, args.out_csv)
-    plot_results(data, save_path=args.out_png, ref_data=ref_data)
+    plot_results(data, save_path=args.out_png, ref_data=ref_data, v_ref_data=v_ref_data)
 
 
 if __name__ == '__main__':

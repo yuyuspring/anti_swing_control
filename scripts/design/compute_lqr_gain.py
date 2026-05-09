@@ -42,18 +42,21 @@ def build_state_space(g: float, L: float, pendulum_gain: float = 0.6):
     mu = pendulum_gain
     denom = 1.0 - mu
 
+    # Linearization with u = F/M (UAV thrust acceleration):
+    # ddx = u + mu*g/(1-mu) * theta
+    # ddtheta = -g/(L*(1-mu)) * theta - u/L
     A = np.array([
-        [0.0, mu * g / denom, 0.0, 0.0],     # vx_dot = a1/(1-mu) + mu*g/(1-mu)*theta
+        [0.0, mu * g / denom, 0.0, 0.0],     # vx_dot = u + mu*g/(1-mu)*theta
         [0.0, 0.0, 1.0, 0.0],                 # theta_dot = omega
-        [0.0, -g / (L * denom), 0.0, 0.0],   # omega_dot = -g/(L*(1-mu))*theta - ...
+        [0.0, -g / (L * denom), 0.0, 0.0],   # omega_dot = -g/(L*(1-mu))*theta - u/L
         [1.0, 0.0, 0.0, 0.0]                  # int_dot = vx_err
     ], dtype=float)
 
     B = np.array([
-        [1.0 / denom],           # 加速度直接影响速度 (放大 1/(1-mu))
-        [0.0],                   # 加速度不直接影响角度
-        [-1.0 / (L * denom)],    # 加速度通过惯性力影响角加速度
-        [0.0]                    # 加速度不直接影响积分
+        [1.0],        # 加速度直接影响速度
+        [0.0],        # 加速度不直接影响角度
+        [-1.0 / L],   # 加速度通过惯性力影响角加速度
+        [0.0]         # 加速度不直接影响积分
     ], dtype=float)
 
     return A, B
@@ -106,18 +109,20 @@ def generate_lqr_gains(
 
     # Mode 1: Diagonal - 对角Q，直接惩罚状态量 + 积分
     # 增大 q_omega 确保 K_omega < 0（提供正阻尼）
-    K_diagonal = solve_lqr(Ad, Bd, [8.0, 1000.0, 3000.0, 0.1], 2.0)
+    K_diagonal = solve_lqr(Ad, Bd, [20.0, 1000.0, 5000.0, 0.02], 2.0)
 
-    # Mode 2: Coupled - 非对角Q，惩罚系统总能量 + 积分
-    # q_ke=0 去掉速度-角速度耦合，使 K_omega 更容易为负
+    # Mode 2: Coupled - 真正的非对角Q，惩罚系统总能量 + 耦合项 + 积分
+    # Q[0,2] = q_ke 引入速度-角速度耦合（动能交叉项）
+    # 增大 q_omega 补偿耦合导致的阻尼损失，确保 K_omega < 0
     q_drone = 20.0
-    q_pe_sys = 3000.0
-    q_omega_extra_sys = 2000.0
-    q_int = 1.0
+    q_pe_sys = 1000.0
+    q_omega_extra_sys = 5000.0
+    q_ke = 100.0       # 非对角耦合强度（vx * omega 交叉项）
+    q_int = 0.02
     Q_coupled = np.array([
-        [q_drone, 0.0, 0.0, 0.0],
+        [q_drone, 0.0, q_ke, 0.0],
         [0.0, q_pe_sys, 0.0, 0.0],
-        [0.0, 0.0, q_omega_extra_sys, 0.0],
+        [q_ke, 0.0, q_omega_extra_sys, 0.0],
         [0.0, 0.0, 0.0, q_int]
     ], dtype=float)
     K_coupled = solve_lqr(Ad, Bd, Q_coupled, 2.0)

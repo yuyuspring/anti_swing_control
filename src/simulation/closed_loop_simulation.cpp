@@ -77,7 +77,10 @@ void ClosedLoopSimulation::run() {
               << "  Pendulum gain   : " << config_.pendulumGain << " [-]\n"
               << "  Initial theta   : " << rad2deg(config_.initialTheta) << " deg\n"
               << "  Duration        : " << config_.tFinal << " s\n"
-              << "  Control period  : " << config_.dtControl << " s\n";
+              << "  Control period  : " << config_.dtControl << " s\n"
+              << "  Control source  : "
+              << (config_.useObserverEstimate ? "Observer estimate" : "Ground truth")
+              << "\n";
 
     while (state.time <= config_.tFinal + 1e-9) {
         // Observer update at every dtControl interval
@@ -125,22 +128,20 @@ void ClosedLoopSimulation::run() {
                 vxErrorIntegral = intPreview;
             }
 
-            // Integral decay: when error and integral have same sign and error is shrinking,
-            // decay the integral faster to reduce overshoot
-            if (vxError * vxErrorIntegral > 0.0 && std::abs(vxError) < std::abs(vxErrorPrev)) {
-                vxErrorIntegral *= 0.9;
-            }
-            vxErrorPrev = vxError;
-
             // Anti-windup clamp
-            const double kIntMax = 3.0;
+            const double kIntMax = 4.0;
             if (vxErrorIntegral > kIntMax) vxErrorIntegral = kIntMax;
             if (vxErrorIntegral < -kIntMax) vxErrorIntegral = -kIntMax;
 
             LqrController::State lqrState;
             lqrState.vx = state.droneVx;
-            lqrState.theta = est.thetaPitch;
-            lqrState.omega = est.omegaPitch;
+            if (config_.useObserverEstimate) {
+                lqrState.theta = est.thetaPitch;
+                lqrState.omega = est.omegaPitch;
+            } else {
+                lqrState.theta = state.theta;
+                lqrState.omega = state.thetaDot;
+            }
             lqrState.vxIntegral = vxErrorIntegral;
             axTarget = controller_.computeControl(lqrState, vRef);
 
